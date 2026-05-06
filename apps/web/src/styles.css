@@ -423,6 +423,25 @@ button {
   gap: 10px;
 }
 
+.sub-entity-list {
+  display: grid;
+  gap: 10px;
+}
+
+.sub-entity-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sub-entity-item span {
+  color: rgba(245, 241, 232, 0.7);
+}
+
 .amount-positive {
   color: #9be7a7;
 }

@@ -9,22 +9,32 @@ import type {
   AccountListItem,
   AccountsSnapshot,
   ArchiveAccountInput,
+  Contract,
+  ContractAdjustment,
+  ContractsSnapshot,
   CreateAccountInput,
+  CreateContractAdjustmentInput,
+  CreateContractInput,
   CreateTransactionInput,
+  EndContractInput,
   HorizonSettings,
   HorizonSnapshot,
   ManualTransaction,
   TransactionsSnapshot,
+  UpdateContractInput,
   UpdateHorizonSettingsInput,
   UpdateAccountInput,
   UpdateTransactionInput,
 } from '@shf/contracts';
 import {
   buildAccountsSnapshot,
+  buildContractsSnapshot,
   buildTransactionsSnapshot,
   sanitizeAccountInput,
+  sanitizeContractInput,
   sanitizeTransactionInput,
   validateAccountInput,
+  validateContractInput,
   validateTransactionInput,
 } from '@shf/domain-core';
 
@@ -44,11 +54,18 @@ type FinancialAuditAction =
   | 'ACCOUNT_ARCHIVED'
   | 'ACCOUNT_CREATED'
   | 'ACCOUNT_UPDATED'
+  | 'CONTRACT_ADJUSTED'
+  | 'CONTRACT_CREATED'
+  | 'CONTRACT_ENDED'
+  | 'CONTRACT_UPDATED'
   | 'TRANSACTION_CREATED'
   | 'TRANSACTION_DELETED'
   | 'TRANSACTION_UPDATED';
 
-type FinancialAuditResourceType = 'account' | 'manual_transaction';
+type FinancialAuditResourceType =
+  | 'account'
+  | 'manual_transaction'
+  | 'recurring_contract';
 
 type HorizonCacheEntry = {
   referenceDate: string;
@@ -107,6 +124,14 @@ export class FinanceService {
     );
   }
 
+  async getContractsSnapshot(userId: string): Promise<ContractsSnapshot> {
+    const contracts = await this.dataAccess.contracts.listByUserId(userId);
+
+    return buildContractsSnapshot(contracts, {
+      currentDate: this.now().toISOString().slice(0, 10),
+    });
+  }
+
   async createAccount(
     userId: string,
     input: CreateAccountInput,
@@ -146,6 +171,213 @@ export class FinanceService {
     this.invalidateHorizonCache(userId);
 
     return account;
+  }
+
+  async createContract(
+    userId: string,
+    input: CreateContractInput,
+    context: FinanceRequestContext,
+  ): Promise<Contract> {
+    const sanitizedInput = sanitizeContractInput(input);
+    const issues = validateContractInput(sanitizedInput);
+
+    if (issues.length > 0) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', issues);
+    }
+
+    const contract = await this.database.runInTransaction(async (transaction) => {
+      const contract = await this.dataAccess.contracts.create(
+        userId,
+        sanitizedInput,
+        this.now(),
+        transaction,
+      );
+
+      await this.insertAuditEvent(
+        transaction,
+        userId,
+        'recurring_contract',
+        contract.id,
+        'CONTRACT_CREATED',
+        context,
+        {
+          accountId: contract.accountId,
+          amountInCents: contract.amountInCents,
+          type: contract.type,
+        },
+      );
+
+      return contract;
+    });
+
+    this.invalidateHorizonCache(userId);
+
+    return contract;
+  }
+
+  async updateContract(
+    userId: string,
+    input: UpdateContractInput,
+    context: FinanceRequestContext,
+  ): Promise<Contract> {
+    const sanitizedInput = sanitizeContractInput(input);
+    const issues = validateContractInput(sanitizedInput);
+
+    if (issues.length > 0) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', issues);
+    }
+
+    const contract = await this.database.runInTransaction(async (transaction) => {
+      const contract = await this.dataAccess.contracts.update(
+        userId,
+        sanitizedInput,
+        this.now(),
+        transaction,
+      );
+
+      await this.insertAuditEvent(
+        transaction,
+        userId,
+        'recurring_contract',
+        contract.id,
+        'CONTRACT_UPDATED',
+        context,
+        {
+          accountId: contract.accountId,
+          amountInCents: contract.amountInCents,
+          type: contract.type,
+        },
+      );
+
+      return contract;
+    });
+
+    this.invalidateHorizonCache(userId);
+
+    return contract;
+  }
+
+  async createContractAdjustment(
+    userId: string,
+    input: CreateContractAdjustmentInput,
+    context: FinanceRequestContext,
+  ): Promise<ContractAdjustment> {
+    const contract = await this.dataAccess.contracts.findById(
+      userId,
+      input.contractId,
+    );
+
+    if (!contract) {
+      throw new AppError(
+        404,
+        'FINANCE_CONTRACT_NOT_FOUND',
+        'Contrato nao encontrado para o usuario autenticado.',
+      );
+    }
+
+    if (input.effectiveStartDate < contract.startDate) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', [
+        {
+          field: 'effectiveStartDate',
+          message:
+            'A data efetiva do reajuste nao pode ser anterior ao inicio do contrato.',
+        },
+      ]);
+    }
+
+    if (contract.endDate && input.effectiveStartDate > contract.endDate) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', [
+        {
+          field: 'effectiveStartDate',
+          message:
+            'A data efetiva do reajuste nao pode ultrapassar o encerramento do contrato.',
+        },
+      ]);
+    }
+
+    const adjustment = await this.database.runInTransaction(async (transaction) => {
+      const adjustment = await this.dataAccess.contracts.createAdjustment(
+        userId,
+        input,
+        this.now(),
+        transaction,
+      );
+
+      await this.insertAuditEvent(
+        transaction,
+        userId,
+        'recurring_contract',
+        contract.id,
+        'CONTRACT_ADJUSTED',
+        context,
+        {
+          amountInCents: adjustment.amountInCents,
+          effectiveStartDate: adjustment.effectiveStartDate,
+        },
+      );
+
+      return adjustment;
+    });
+
+    this.invalidateHorizonCache(userId);
+
+    return adjustment;
+  }
+
+  async endContract(
+    userId: string,
+    input: EndContractInput,
+    context: FinanceRequestContext,
+  ): Promise<Contract> {
+    const contract = await this.dataAccess.contracts.findById(
+      userId,
+      input.contractId,
+    );
+
+    if (!contract) {
+      throw new AppError(
+        404,
+        'FINANCE_CONTRACT_NOT_FOUND',
+        'Contrato nao encontrado para o usuario autenticado.',
+      );
+    }
+
+    if (input.endDate < contract.startDate) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', [
+        {
+          field: 'endDate',
+          message:
+            'A data final nao pode ser anterior ao inicio do contrato.',
+        },
+      ]);
+    }
+
+    const endedContract = await this.database.runInTransaction(async (transaction) => {
+      const endedContract = await this.dataAccess.contracts.end(
+        userId,
+        input,
+        this.now(),
+        transaction,
+      );
+
+      await this.insertAuditEvent(
+        transaction,
+        userId,
+        'recurring_contract',
+        endedContract.id,
+        'CONTRACT_ENDED',
+        context,
+        {
+          endDate: endedContract.endDate,
+        },
+      );
+
+      return endedContract;
+    });
+
+    this.invalidateHorizonCache(userId);
+
+    return endedContract;
   }
 
   async updateAccount(
@@ -268,12 +500,14 @@ export class FinanceService {
     }
 
     const settings = await this.getHorizonSettings(userId);
-    const [accountsSnapshot, transactionsSnapshot] = await Promise.all([
+    const [accountsSnapshot, contractsSnapshot, transactionsSnapshot] = await Promise.all([
       this.getAccountsSnapshot(userId),
+      this.getContractsSnapshot(userId),
       this.listTransactions(userId),
     ]);
     const snapshot = buildOfficialHorizonSnapshot({
       accountsSnapshot,
+      contractsSnapshot,
       generatedAt,
       referenceDate,
       settings,

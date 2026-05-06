@@ -57,6 +57,14 @@ export function AppShell({ children }: PropsWithChildren) {
             className={({ isActive }) =>
               isActive ? 'shell-nav-link shell-nav-link-active' : 'shell-nav-link'
             }
+            to="/app/contratos"
+          >
+            Contratos
+          </NavLink>
+          <NavLink
+            className={({ isActive }) =>
+              isActive ? 'shell-nav-link shell-nav-link-active' : 'shell-nav-link'
+            }
             to="/app/acesso"
           >
             Seguranca da conta

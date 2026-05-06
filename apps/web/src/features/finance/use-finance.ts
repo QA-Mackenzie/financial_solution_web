@@ -1,8 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   CreateAccountInput,
+  CreateContractAdjustmentInput,
+  CreateContractInput,
   CreateTransactionInput,
+  EndContractInput,
   UpdateHorizonSettingsInput,
+  UpdateContractInput,
   UpdateAccountInput,
   UpdateTransactionInput,
 } from '@shf/contracts';
@@ -10,12 +14,14 @@ import type {
 import { financeApi } from '../../lib/api';
 
 export const accountsSnapshotQueryKey = ['finance', 'accounts', 'snapshot'];
+export const contractsSnapshotQueryKey = ['finance', 'contracts', 'snapshot'];
 export const horizonSnapshotQueryKey = ['finance', 'horizon', 'snapshot'];
 export const transactionsSnapshotQueryKey = ['finance', 'transactions', 'snapshot'];
 
 async function invalidateFinancialQueries(queryClient: ReturnType<typeof useQueryClient>) {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: accountsSnapshotQueryKey }),
+    queryClient.invalidateQueries({ queryKey: contractsSnapshotQueryKey }),
     queryClient.invalidateQueries({ queryKey: horizonSnapshotQueryKey }),
     queryClient.invalidateQueries({ queryKey: transactionsSnapshotQueryKey }),
   ]);
@@ -32,6 +38,13 @@ export function useTransactionsSnapshotQuery() {
   return useQuery({
     queryFn: financeApi.getTransactionsSnapshot,
     queryKey: transactionsSnapshotQueryKey,
+  });
+}
+
+export function useContractsSnapshotQuery() {
+  return useQuery({
+    queryFn: financeApi.getContractsSnapshot,
+    queryKey: contractsSnapshotQueryKey,
   });
 }
 
@@ -74,6 +87,43 @@ export function useCreateTransactionMutation() {
 
   return useMutation({
     mutationFn: (input: CreateTransactionInput) => financeApi.createTransaction(input),
+    onSuccess: async () => invalidateFinancialQueries(queryClient),
+  });
+}
+
+export function useCreateContractMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: CreateContractInput) => financeApi.createContract(input),
+    onSuccess: async () => invalidateFinancialQueries(queryClient),
+  });
+}
+
+export function useUpdateContractMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: UpdateContractInput) => financeApi.updateContract(input),
+    onSuccess: async () => invalidateFinancialQueries(queryClient),
+  });
+}
+
+export function useCreateContractAdjustmentMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: CreateContractAdjustmentInput) =>
+      financeApi.createContractAdjustment(input),
+    onSuccess: async () => invalidateFinancialQueries(queryClient),
+  });
+}
+
+export function useEndContractMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: EndContractInput) => financeApi.endContract(input),
     onSuccess: async () => invalidateFinancialQueries(queryClient),
   });
 }

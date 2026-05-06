@@ -370,6 +370,8 @@ O horizonte deixa de ser logica acoplada a UI e passa a ser um servico oficial, 
 
 ## Sprint 5 - Contratos recorrentes e reajustes
 
+Status: concluida em 2026-05-06
+
 ### Objetivo
 
 Adicionar ao sistema web as recorrencias fixas que alimentam o horizonte automatico.
@@ -382,20 +384,49 @@ Adicionar ao sistema web as recorrencias fixas que alimentam o horizonte automat
 
 ### Backlog recomendado
 
-- [ ] Implementar schema, repositorio e endpoints de contratos recorrentes
-- [ ] Portar contractInput, contractProjection e contractSnapshot
-- [ ] Implementar reajustes com vigencia futura e historico preservado
-- [ ] Implementar encerramento e cancelamento sem corromper meses passados
-- [ ] Integrar contratos ao servico oficial do horizonte
-- [ ] Criar UI de contratos com cadastro, reajuste e encerramento
-- [ ] Atualizar dashboard e horizonte para evidenciar ocorrencias recorrentes
-- [ ] Escrever testes de integracao para vigencia, encerramento e recalculo do horizonte
-- [ ] Escrever E2E para criar contrato, reajustar, validar efeito apenas futuro
-- [ ] Revisar auditoria de eventos do modulo
+- [x] Implementar schema, repositorio e endpoints de contratos recorrentes
+- [x] Portar contractInput, contractProjection e contractSnapshot
+- [x] Implementar reajustes com vigencia futura e historico preservado
+- [x] Implementar encerramento e cancelamento sem corromper meses passados
+- [x] Integrar contratos ao servico oficial do horizonte
+- [x] Criar UI de contratos com cadastro, reajuste e encerramento
+- [x] Atualizar dashboard e horizonte para evidenciar ocorrencias recorrentes
+- [x] Escrever testes de integracao para vigencia, encerramento e recalculo do horizonte
+- [x] Escrever E2E para criar contrato, reajustar, validar efeito apenas futuro
+- [x] Revisar auditoria de eventos do modulo
 
 ### Gate de saida
 
 Receitas e despesas recorrentes passam a ser calculadas automaticamente na web com comportamento equivalente ao dominio atual.
+
+### Implementado nesta sprint
+
+- contratos compartilhados em packages/contracts expandidos com schemas Zod e tipos para contratos, reajustes, snapshots, payloads de criacao/edicao e encerramento
+- reuso das regras puras ja existentes em packages/domain-core para validacao, snapshot e projecao de contratos recorrentes dentro da arquitetura web
+- ContractsRepository owner-scoped, FinanceService e rotas financeiras da API atualizados com create, update, adjust e end, incluindo auditoria em audit.financial_events
+- integracao oficial de contratos recorrentes ao horizonte de 24 meses no backend, com invalidação do cache sempre que uma recorrencia e alterada
+- testes de regressao do horizonte e testes HTTP de contratos cobrindo reajuste futuro, encerramento, efeito apenas futuro, cache e bloqueio cross-user
+- cliente web atualizado com endpoints e hooks React Query de contratos, nova pagina protegida de contratos recorrentes e navegacao dedicada na shell autenticada
+- dashboard web expandido para evidenciar contratos ativos, totais recorrentes e impacto continuo no horizonte
+- teste da shell web cobrindo criar contrato, programar reajuste, encerrar recorrencia e refletir o novo estado no frontend
+
+### Contratos recorrentes no horizonte oficial
+
+- contratos ativos passam a gerar ocorrencias mensais diretamente no backend oficial do horizonte
+- reajustes respeitam effectiveStartDate e preservam os meses ja ocorridos sem reescrever historico passado
+- encerramentos removem apenas as ocorrencias posteriores a endDate, mantendo a trilha auditavel das recorrencias anteriores
+
+### Validacao executada
+
+- npm run test --workspace @shf/api -- horizon-projection.test.ts
+- npm run test --workspace @shf/api -- contract-routes.test.ts
+- npm run test --workspace @shf/web -- App.test.tsx
+- npm run test --workspace @shf/api
+- npm run typecheck --workspace @shf/web
+- npm run test --workspace @shf/web
+- npm run check
+- npm run infra:up
+- npm run db:check
 
 ---
 
