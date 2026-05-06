@@ -18,6 +18,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -86,6 +87,15 @@ button {
 }
 
 .auth-form input {
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+}
+
+.finance-form input,
+.finance-form select {
   padding: 14px 16px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 14px;
@@ -194,6 +204,20 @@ button {
   align-content: start;
 }
 
+.page-stack {
+  display: grid;
+  gap: 20px;
+}
+
+.panel-grid {
+  display: grid;
+  gap: 20px;
+}
+
+.panel-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -207,6 +231,43 @@ button {
 .dashboard-card {
   padding: 24px;
   border-radius: 24px;
+}
+
+.form-card,
+.summary-card {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+}
+
+.section-heading-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.finance-form {
+  display: grid;
+  gap: 14px;
+}
+
+.finance-form label {
+  display: grid;
+  gap: 8px;
+}
+
+.finance-form small {
+  min-height: 18px;
+  color: #ffd3b6;
+}
+
+.ghost-button {
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #f5f1e8;
 }
 
 .detail-list {
@@ -236,6 +297,61 @@ button {
   background: rgba(255, 255, 255, 0.1);
 }
 
+.summary-amount {
+  font-size: clamp(1.9rem, 3vw, 2.8rem);
+  line-height: 1.1;
+}
+
+.stats-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.stat-item {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.stack-list {
+  display: grid;
+  gap: 14px;
+}
+
+.entity-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.entity-card span,
+.entity-card small {
+  color: rgba(245, 241, 232, 0.74);
+}
+
+.entity-metrics {
+  display: grid;
+  gap: 4px;
+}
+
+.entity-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.amount-positive {
+  color: #9be7a7;
+}
+
+.amount-negative {
+  color: #ffb4a2;
+}
+
 .screen-message {
   display: grid;
   min-height: 100vh;
@@ -246,6 +362,15 @@ button {
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: 1fr;
+  }
+
+  .panel-grid-2,
+  .section-heading-row {
+    grid-template-columns: 1fr;
+  }
+
+  .section-heading-row {
+    display: grid;
   }
 
   .dashboard-grid {

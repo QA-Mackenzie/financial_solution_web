@@ -4,11 +4,13 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { PublicOnlyRoute } from './components/PublicOnlyRoute';
+import { AccountsPage } from './features/accounts/AccountsPage';
 import { AuthPage } from './features/auth/AuthPage';
 import { PasswordRecoveryPage } from './features/auth/PasswordRecoveryPage';
 import { PasswordResetPage } from './features/auth/PasswordResetPage';
 import { AccessPage } from './features/dashboard/AccessPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
+import { TransactionsPage } from './features/transactions/TransactionsPage';
 import { queryClient } from './lib/query-client';
 
 function LandingPage() {
@@ -62,6 +64,26 @@ export function App() {
               </ProtectedRoute>
             }
             path="/app"
+          />
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <AccountsPage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+            path="/app/contas"
+          />
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <TransactionsPage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+            path="/app/lancamentos"
           />
           <Route
             element={

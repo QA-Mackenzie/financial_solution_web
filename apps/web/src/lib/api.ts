@@ -1,10 +1,18 @@
 import type {
+  Account,
+  AccountsSnapshot,
+  CreateAccountInput,
+  CreateTransactionInput,
   LoginInput,
+  ManualTransaction,
   PasswordResetInput,
   PasswordResetRequestInput,
   PasswordResetRequestResult,
   RegisterInput,
   SessionPayload,
+  TransactionsSnapshot,
+  UpdateAccountInput,
+  UpdateTransactionInput,
 } from '@shf/contracts';
 
 const apiBaseUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
@@ -83,6 +91,85 @@ export const authApi = {
     return request('/api/v1/auth/password-reset', {
       method: 'POST',
       body: JSON.stringify(input),
+    });
+  },
+};
+
+export const financeApi = {
+  async getAccountsSnapshot(): Promise<AccountsSnapshot> {
+    const payload = await request<{ snapshot: AccountsSnapshot }>('/api/v1/accounts');
+    return payload.snapshot;
+  },
+  async createAccount(input: CreateAccountInput): Promise<Account> {
+    const payload = await request<{ account: Account }>('/api/v1/accounts', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+
+    return payload.account;
+  },
+  async updateAccount(input: UpdateAccountInput): Promise<Account> {
+    const payload = await request<{ account: Account }>(
+      `/api/v1/accounts/${input.id}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          name: input.name,
+          openingBalanceInCents: input.openingBalanceInCents,
+          type: input.type,
+        }),
+      },
+    );
+
+    return payload.account;
+  },
+  archiveAccount(id: string): Promise<Account> {
+    return request<{ account: Account }>(`/api/v1/accounts/${id}/archive`, {
+      method: 'POST',
+    }).then((payload) => payload.account);
+  },
+  async getTransactionsSnapshot(): Promise<TransactionsSnapshot> {
+    const payload = await request<{ snapshot: TransactionsSnapshot }>(
+      '/api/v1/transactions',
+    );
+
+    return payload.snapshot;
+  },
+  async createTransaction(input: CreateTransactionInput): Promise<ManualTransaction> {
+    const payload = await request<{ transaction: ManualTransaction }>(
+      '/api/v1/transactions',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+    );
+
+    return payload.transaction;
+  },
+  async updateTransaction(
+    input: UpdateTransactionInput,
+  ): Promise<ManualTransaction> {
+    const payload = await request<{ transaction: ManualTransaction }>(
+      `/api/v1/transactions/${input.id}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          accountId: input.accountId,
+          amountInCents: input.amountInCents,
+          category: input.category,
+          description: input.description,
+          tagIds: input.tagIds,
+          transactionDate: input.transactionDate,
+          type: input.type,
+        }),
+      },
+    );
+
+    return payload.transaction;
+  },
+  deleteTransaction(id: string): Promise<void> {
+    return request(`/api/v1/transactions/${id}`, {
+      method: 'DELETE',
     });
   },
 };
