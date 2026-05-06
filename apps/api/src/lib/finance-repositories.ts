@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import type {
+  ArchiveAccountInput,
   Account,
   AccountListItem,
   CreateAccountInput,
@@ -10,6 +11,8 @@ import type {
   ManualTransaction,
   Tag,
   TagListItem,
+  UpdateAccountInput,
+  UpdateTransactionInput,
   TransactionListItem,
 } from '@shf/contracts';
 import {
@@ -483,10 +486,11 @@ export class AccountsRepository {
     userId: string,
     input: CreateAccountInput,
     now = new Date(),
+    database: DatabaseExecutor = this.database,
   ): Promise<Account> {
     const sanitizedInput = sanitizeAccountInput(input);
     const nowIsoString = now.toISOString();
-    const result = await this.database.query<AccountRow>(
+    const result = await database.query<AccountRow>(
       `insert into finance.accounts (
          id,
          user_id,
@@ -517,6 +521,87 @@ export class AccountsRepository {
         nowIsoString,
       ],
     );
+
+    return mapAccount(result.rows[0]);
+  }
+
+  async update(
+    userId: string,
+    input: UpdateAccountInput,
+    now = new Date(),
+    database: DatabaseExecutor = this.database,
+  ): Promise<Account> {
+    const sanitizedInput = sanitizeAccountInput(input);
+    const nowIsoString = now.toISOString();
+    const result = await database.query<AccountRow>(
+      `update finance.accounts
+          set name = $3,
+              type = $4,
+              opening_balance_in_cents = $5,
+              updated_at = $6
+        where user_id = $1 and id = $2
+        returning id,
+                  user_id,
+                  name,
+                  type,
+                  opening_balance_in_cents,
+                  is_archived,
+                  archived_at,
+                  created_at,
+                  updated_at`,
+      [
+        userId,
+        sanitizedInput.id,
+        sanitizedInput.name,
+        sanitizedInput.type,
+        sanitizedInput.openingBalanceInCents,
+        nowIsoString,
+      ],
+    );
+
+    if ((result.rowCount ?? 0) === 0) {
+      throw new AppError(
+        404,
+        'FINANCE_ACCOUNT_NOT_FOUND',
+        'Conta nao encontrada para o usuario autenticado.',
+      );
+    }
+
+    return mapAccount(result.rows[0]);
+  }
+
+  async archive(
+    userId: string,
+    input: ArchiveAccountInput,
+    now = new Date(),
+    database: DatabaseExecutor = this.database,
+  ): Promise<Account> {
+    const nowIsoString = now.toISOString();
+    const result = await database.query<AccountRow>(
+      `update finance.accounts
+          set is_archived = true,
+              archived_at = coalesce(archived_at, $3),
+              updated_at = $3
+        where user_id = $1 and id = $2
+        returning id,
+                  user_id,
+                  name,
+                  type,
+                  opening_balance_in_cents,
+                  is_archived,
+                  archived_at,
+                  created_at,
+                  updated_at`,
+      [userId, input.id, nowIsoString],
+    );
+
+    if ((result.rowCount ?? 0) === 0) {
+      throw new AppError(
+        404,
+        'FINANCE_ACCOUNT_NOT_FOUND',
+        'Conta nao encontrada para o usuario autenticado.',
+      );
+    }
 
     return mapAccount(result.rows[0]);
   }
@@ -675,65 +760,223 @@ export class ManualTransactionsRepository {
     userId: string,
     input: CreateTransactionInput,
     now = new Date(),
+    database?: DatabaseExecutor,
   ): Promise<ManualTransaction> {
     const sanitizedInput = sanitizeTransactionInput(input);
     const tagIds = sanitizeTagIds(sanitizedInput.tagIds);
 
-    return this.database.runInTransaction(async (transaction) => {
-      await assertOwnedAccount(transaction, userId, sanitizedInput.accountId);
-      await assertOwnedTags(transaction, userId, tagIds);
+    if (database) {
+      return this.createWithinTransaction(
+        database,
+        userId,
+        sanitizedInput,
+        tagIds,
+        now,
+      );
+    }
 
-      const transactionId = randomUUID();
-      const nowIsoString = now.toISOString();
+    return this.database.runInTransaction((transaction) =>
+      this.createWithinTransaction(transaction, userId, sanitizedInput, tagIds, now),
+    );
+  }
+
+  async update(
+    userId: string,
+    input: UpdateTransactionInput,
+    now = new Date(),
+    database?: DatabaseExecutor,
+  ): Promise<ManualTransaction> {
+    const sanitizedInput = sanitizeTransactionInput(input);
+    const tagIds = sanitizeTagIds(sanitizedInput.tagIds);
+
+    if (database) {
+      return this.updateWithinTransaction(
+        database,
+        userId,
+        sanitizedInput,
+        tagIds,
+        now,
+      );
+    }
+
+    return this.database.runInTransaction((transaction) =>
+      this.updateWithinTransaction(transaction, userId, sanitizedInput, tagIds, now),
+    );
+  }
+
+  async delete(
+    userId: string,
+    transactionId: string,
+    database?: DatabaseExecutor,
+  ): Promise<ManualTransaction> {
+    if (database) {
+      return this.deleteWithinTransaction(database, userId, transactionId);
+    }
+
+    return this.database.runInTransaction((transaction) =>
+      this.deleteWithinTransaction(transaction, userId, transactionId),
+    );
+  }
+
+  private async createWithinTransaction(
+    transaction: DatabaseExecutor,
+    userId: string,
+    sanitizedInput: CreateTransactionInput,
+    tagIds: readonly string[],
+    now: Date,
+  ): Promise<ManualTransaction> {
+    await assertOwnedAccount(transaction, userId, sanitizedInput.accountId);
+    await assertOwnedTags(transaction, userId, tagIds);
+
+    const transactionId = randomUUID();
+    const nowIsoString = now.toISOString();
+    await transaction.query(
+      `insert into finance.manual_transactions (
+         id,
+         user_id,
+         account_id,
+         type,
+         description,
+         category,
+         amount_in_cents,
+         transaction_date,
+         payload,
+         created_at,
+         updated_at
+       ) values ($1, $2, $3, $4, $5, $6, $7, $8, '{}'::jsonb, $9, $10)`,
+      [
+        transactionId,
+        userId,
+        sanitizedInput.accountId,
+        sanitizedInput.type,
+        sanitizedInput.description,
+        sanitizedInput.category ?? null,
+        sanitizedInput.amountInCents,
+        sanitizedInput.transactionDate,
+        nowIsoString,
+        nowIsoString,
+      ],
+    );
+
+    for (const tagId of tagIds) {
       await transaction.query(
-        `insert into finance.manual_transactions (
-           id,
+        `insert into finance.manual_transaction_tags (
            user_id,
-           account_id,
-           type,
-           description,
-           category,
-           amount_in_cents,
-           transaction_date,
-           payload,
-           created_at,
-           updated_at
-         ) values ($1, $2, $3, $4, $5, $6, $7, $8, '{}'::jsonb, $9, $10)`,
-        [
-          transactionId,
-          userId,
-          sanitizedInput.accountId,
-          sanitizedInput.type,
-          sanitizedInput.description,
-          sanitizedInput.category ?? null,
-          sanitizedInput.amountInCents,
-          sanitizedInput.transactionDate,
-          nowIsoString,
-          nowIsoString,
-        ],
+           manual_transaction_id,
+           tag_id,
+           created_at
+         ) values ($1, $2, $3, $4)`,
+        [userId, transactionId, tagId, nowIsoString],
       );
+    }
 
-      for (const tagId of tagIds) {
-        await transaction.query(
-          `insert into finance.manual_transaction_tags (
-             user_id,
-             manual_transaction_id,
-             tag_id,
-             created_at
-           ) values ($1, $2, $3, $4)`,
-          [userId, transactionId, tagId, nowIsoString],
-        );
-      }
+    const created = await transaction.query<ManualTransactionRow>(
+      `${buildManualTransactionsSelect(
+        'where mt.user_id = $1 and mt.id = $2',
+      )}`,
+      [userId, transactionId],
+    );
 
-      const created = await transaction.query<ManualTransactionRow>(
-        `${buildManualTransactionsSelect(
-          'where mt.user_id = $1 and mt.id = $2',
-        )}`,
-        [userId, transactionId],
+    return mapManualTransaction(created.rows[0]);
+  }
+
+  private async updateWithinTransaction(
+    transaction: DatabaseExecutor,
+    userId: string,
+    sanitizedInput: UpdateTransactionInput,
+    tagIds: readonly string[],
+    now: Date,
+  ): Promise<ManualTransaction> {
+    const existing = await transaction.query<{ id: string }>(
+      'select id from finance.manual_transactions where user_id = $1 and id = $2',
+      [userId, sanitizedInput.id],
+    );
+
+    if ((existing.rowCount ?? 0) === 0) {
+      throw new AppError(
+        404,
+        'FINANCE_TRANSACTION_NOT_FOUND',
+        'Lancamento nao encontrado para o usuario autenticado.',
       );
+    }
 
-      return mapManualTransaction(created.rows[0]);
-    });
+    await assertOwnedAccount(transaction, userId, sanitizedInput.accountId);
+    await assertOwnedTags(transaction, userId, tagIds);
+
+    await transaction.query(
+      `update finance.manual_transactions
+          set account_id = $3,
+              type = $4,
+              description = $5,
+              category = $6,
+              amount_in_cents = $7,
+              transaction_date = $8,
+              updated_at = $9
+        where user_id = $1 and id = $2`,
+      [
+        userId,
+        sanitizedInput.id,
+        sanitizedInput.accountId,
+        sanitizedInput.type,
+        sanitizedInput.description,
+        sanitizedInput.category ?? null,
+        sanitizedInput.amountInCents,
+        sanitizedInput.transactionDate,
+        now.toISOString(),
+      ],
+    );
+
+    await transaction.query(
+      'delete from finance.manual_transaction_tags where user_id = $1 and manual_transaction_id = $2',
+      [userId, sanitizedInput.id],
+    );
+
+    for (const tagId of tagIds) {
+      await transaction.query(
+        `insert into finance.manual_transaction_tags (
+           user_id,
+           manual_transaction_id,
+           tag_id,
+           created_at
+         ) values ($1, $2, $3, $4)`,
+        [userId, sanitizedInput.id, tagId, now.toISOString()],
+      );
+    }
+
+    const updated = await transaction.query<ManualTransactionRow>(
+      `${buildManualTransactionsSelect(
+        'where mt.user_id = $1 and mt.id = $2',
+      )}`,
+      [userId, sanitizedInput.id],
+    );
+
+    return mapManualTransaction(updated.rows[0]);
+  }
+
+  private async deleteWithinTransaction(
+    transaction: DatabaseExecutor,
+    userId: string,
+    transactionId: string,
+  ): Promise<ManualTransaction> {
+    const existing = await transaction.query<ManualTransactionRow>(
+      `${buildManualTransactionsSelect('where mt.user_id = $1 and mt.id = $2')}`,
+      [userId, transactionId],
+    );
+
+    if ((existing.rowCount ?? 0) === 0) {
+      throw new AppError(
+        404,
+        'FINANCE_TRANSACTION_NOT_FOUND',
+        'Lancamento nao encontrado para o usuario autenticado.',
+      );
+    }
+
+    await transaction.query(
+      'delete from finance.manual_transactions where user_id = $1 and id = $2',
+      [userId, transactionId],
+    );
+
+    return mapManualTransaction(existing.rows[0]);
   }
 
   async findById(

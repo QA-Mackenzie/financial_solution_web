@@ -250,6 +250,8 @@ A aplicacao possui base relacional segura, com isolamento por usuario comprovado
 
 ## Sprint 3 - Contas e lancamentos manuais end-to-end
 
+Status: concluida em 2026-05-06
+
 ### Objetivo
 
 Entregar o primeiro fluxo financeiro real e utilizavel na versao web, formando a base de saldo atual.
@@ -263,20 +265,47 @@ Entregar o primeiro fluxo financeiro real e utilizavel na versao web, formando a
 
 ### Backlog recomendado
 
-- [ ] Implementar casos de uso e endpoints de contas: criar, editar, arquivar, listar e obter snapshot
-- [ ] Portar e adaptar as regras de validacao de accountInput e accountSnapshot para o novo backend
-- [ ] Implementar casos de uso e endpoints de transacoes manuais
-- [ ] Portar e adaptar transactionInput e transactionSnapshot
-- [ ] Criar tela web de contas com validacoes, empty states e feedback de erro
-- [ ] Criar tela web de lancamentos com criacao, edicao, exclusao, filtros basicos e associacao a conta
-- [ ] Exibir saldo por conta e saldo consolidado atual na shell privada
-- [ ] Registrar auditoria para criacao, edicao e exclusao de contas e lancamentos
-- [ ] Escrever testes E2E para login > criar conta > lancar entrada > lancar saida > validar saldo final
-- [ ] Publicar documentacao curta do modelo de saldo atual e das regras de centavos
+- [x] Implementar casos de uso e endpoints de contas: criar, editar, arquivar, listar e obter snapshot
+- [x] Portar e adaptar as regras de validacao de accountInput e accountSnapshot para o novo backend
+- [x] Implementar casos de uso e endpoints de transacoes manuais
+- [x] Portar e adaptar transactionInput e transactionSnapshot
+- [x] Criar tela web de contas com validacoes, empty states e feedback de erro
+- [x] Criar tela web de lancamentos com criacao, edicao, exclusao, filtros basicos e associacao a conta
+- [x] Exibir saldo por conta e saldo consolidado atual na shell privada
+- [x] Registrar auditoria para criacao, edicao e exclusao de contas e lancamentos
+- [x] Escrever testes E2E para login > criar conta > lancar entrada > lancar saida > validar saldo final
+- [x] Publicar documentacao curta do modelo de saldo atual e das regras de centavos
 
 ### Gate de saida
 
 O usuario consegue montar sua base financeira atual na web e o sistema responde com saldos corretos e rastreaveis.
+
+### Implementado nesta sprint
+
+- contratos compartilhados de contas e lancamentos manuais em packages/contracts com schemas Zod para payloads, snapshots e mutacoes
+- FinanceService e rotas owner-scoped na API para listar snapshot, criar, editar, arquivar contas e criar, editar e excluir lancamentos manuais
+- reutilizacao das regras puras de dominio de accountInput, accountSnapshot, transactionInput e transactionSnapshot no backend web
+- auditoria financeira em audit.financial_events para criacao, edicao, arquivamento e exclusao de recursos financeiros
+- cliente web com financeApi, hooks React Query e paginas protegidas de contas e lancamentos conectadas ao backend oficial
+- dashboard privado atualizado para exibir saldo consolidado, total de entradas e total de saidas do usuario autenticado
+- teste HTTP ponta a ponta na API cobrindo fluxo financeiro e isolamento owner-based
+- teste de shell web cobrindo login, criacao de conta, entrada, saida e validacao do saldo final renderizado
+
+### Modelo de saldo atual e regras de centavos
+
+- todos os valores monetarios sao persistidos e trafegados em centavos inteiros para evitar erro de arredondamento em ponto flutuante
+- o saldo atual de cada conta e calculado como saldo inicial da conta somado aos lancamentos de entrada e subtraido dos lancamentos de saida associados a ela
+- o saldo consolidado atual e a soma dos saldos atuais de todas as contas ativas do usuario autenticado
+- snapshots de contas e lancamentos representam o estado derivado atual do backend e sao a fonte oficial consumida pela shell web
+
+### Validacao executada
+
+- npm run typecheck --workspace @shf/contracts
+- npm run typecheck --workspace @shf/api
+- npm run typecheck --workspace @shf/web
+- npm run test --workspace @shf/api -- test/finance-routes.test.ts
+- npm run test --workspace @shf/api
+- npm run test --workspace @shf/web
 
 ---
 
