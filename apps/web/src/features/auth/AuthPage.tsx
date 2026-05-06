@@ -14,6 +14,8 @@ type AuthPageProps = {
   mode: 'login' | 'register';
 };
 
+const consentVersion = import.meta.env.VITE_CONSENT_VERSION ?? '2026-05';
+
 export function AuthPage({ mode }: AuthPageProps) {
   const navigate = useNavigate();
   const loginMutation = useLoginMutation();
@@ -30,6 +32,8 @@ export function AuthPage({ mode }: AuthPageProps) {
     ),
     defaultValues: isRegisterMode
       ? {
+          consentAccepted: false,
+          consentVersion,
           name: '',
           email: '',
           password: '',
@@ -54,15 +58,18 @@ export function AuthPage({ mode }: AuthPageProps) {
   const nameError = isRegisterMode
     ? (errors as FieldErrors<RegisterInput>).name?.message
     : undefined;
+  const consentError = isRegisterMode
+    ? (errors as FieldErrors<RegisterInput>).consentAccepted?.message
+    : undefined;
 
   return (
     <main className="auth-page">
       <section className="auth-panel">
-        <div className="eyebrow">Sprint 0</div>
+        <div className="eyebrow">Sprint 1</div>
         <h1>{isRegisterMode ? 'Crie sua conta' : 'Entre na plataforma'}</h1>
         <p>
-          Base inicial da SHF Web com frontend React, API Fastify e sessao em
-          cookie.
+          Acesse a shell autenticada da SHF Web com sessao segura, auditoria e
+          recuperacao de senha.
         </p>
 
         <form className="auth-form" onSubmit={onSubmit}>
@@ -90,6 +97,21 @@ export function AuthPage({ mode }: AuthPageProps) {
             <small>{errors.password?.message}</small>
           </label>
 
+          {isRegisterMode ? (
+            <>
+              <input type="hidden" {...register('consentVersion')} />
+
+              <label className="checkbox-field">
+                <input type="checkbox" {...register('consentAccepted')} />
+                <span>
+                  Li e aceito a politica de privacidade e os termos da versao{' '}
+                  {consentVersion}.
+                </span>
+              </label>
+              <small>{consentError}</small>
+            </>
+          ) : null}
+
           {currentMutation.error ? (
             <div className="feedback feedback-error">
               {currentMutation.error.message}
@@ -111,6 +133,12 @@ export function AuthPage({ mode }: AuthPageProps) {
             {isRegisterMode ? 'Fazer login' : 'Criar conta'}
           </Link>
         </div>
+
+        {!isRegisterMode ? (
+          <div className="auth-link-row">
+            <Link to="/esqueci-senha">Esqueci minha senha</Link>
+          </div>
+        ) : null}
       </section>
     </main>
   );

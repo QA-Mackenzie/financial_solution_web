@@ -1,5 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { LoginInput, RegisterInput, SessionPayload } from '@shf/contracts';
+import type {
+  LoginInput,
+  PasswordResetInput,
+  PasswordResetRequestInput,
+  RegisterInput,
+  SessionPayload,
+} from '@shf/contracts';
 
 import { authApi } from '../../lib/api';
 
@@ -42,5 +48,18 @@ export function useLogoutMutation() {
     onSuccess: () => {
       queryClient.setQueryData(sessionQueryKey, null);
     },
+  });
+}
+
+export function usePasswordRecoveryMutation() {
+  return useMutation({
+    mutationFn: (input: PasswordResetRequestInput) =>
+      authApi.requestPasswordRecovery(input),
+  });
+}
+
+export function usePasswordResetMutation() {
+  return useMutation({
+    mutationFn: (input: PasswordResetInput) => authApi.resetPassword(input),
   });
 }
