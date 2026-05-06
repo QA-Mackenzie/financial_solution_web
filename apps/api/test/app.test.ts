@@ -1,13 +1,18 @@
-import { makeLoginInputFixture, makeRegisterInputFixture } from '@shf/test-fixtures';
-import { afterEach, describe, expect, it } from 'vitest';
+import {
+  makeLoginInputFixture,
+  makeRegisterInputFixture,
+} from '@shf/test-fixtures';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildApp } from '../src/app';
-import { authStore } from '../src/lib/auth-store';
-import type { DatabaseClient } from '../src/lib/database';
+import type { DatabaseClient, DatabaseExecutor } from '../src/lib/database';
 
-afterEach(() => {
-  authStore.reset();
-});
+import {
+  createAuthTestEnvironment,
+  type AuthTestEnvironment,
+} from './helpers/create-auth-test-environment';
+
+let authEnvironment: AuthTestEnvironment | null = null;
 
 function makeDatabaseStub(): DatabaseClient {
   return {
@@ -22,8 +27,29 @@ function makeDatabaseStub(): DatabaseClient {
     async close() {
       return;
     },
+    async query() {
+      throw new Error('Nao esperado neste teste.');
+    },
+    async runInTransaction<T>(
+      callback: (database: DatabaseExecutor) => Promise<T>,
+    ): Promise<T> {
+      return callback({
+        query: async () => {
+          throw new Error('Nao esperado neste teste.');
+        },
+      });
+    },
   };
 }
+
+beforeEach(async () => {
+  authEnvironment = await createAuthTestEnvironment();
+});
+
+afterEach(async () => {
+  await authEnvironment?.cleanup();
+  authEnvironment = null;
+});
 
 describe('api bootstrap', () => {
   it('retorna health check', async () => {
@@ -53,9 +79,7 @@ describe('api bootstrap', () => {
   });
 
   it('cria sessao apos cadastro e expoe a sessao atual', async () => {
-    const app = buildApp({ database: makeDatabaseStub() });
-
-    const registerResponse = await app.inject({
+    const registerResponse = await authEnvironment!.app.inject({
       method: 'POST',
       url: '/api/v1/auth/register',
       payload: makeRegisterInputFixture(),
@@ -63,16 +87,11 @@ describe('api bootstrap', () => {
 
     expect(registerResponse.statusCode).toBe(201);
 
-    const setCookieHeader = registerResponse.headers['set-cookie'];
-    expect(setCookieHeader).toBeTruthy();
-
-    const sessionResponse = await app.inject({
+    const sessionResponse = await authEnvironment!.app.inject({
       method: 'GET',
       url: '/api/v1/session',
       headers: {
-        cookie: Array.isArray(setCookieHeader)
-          ? setCookieHeader[0]
-          : setCookieHeader,
+        cookie: registerResponse.headers['set-cookie'] as string,
       },
     });
 
@@ -87,15 +106,13 @@ describe('api bootstrap', () => {
   });
 
   it('autentica um usuario previamente cadastrado', async () => {
-    const app = buildApp({ database: makeDatabaseStub() });
-
-    await app.inject({
+    await authEnvironment!.app.inject({
       method: 'POST',
       url: '/api/v1/auth/register',
       payload: makeRegisterInputFixture(),
     });
 
-    const loginResponse = await app.inject({
+    const loginResponse = await authEnvironment!.app.inject({
       method: 'POST',
       url: '/api/v1/auth/login',
       payload: makeLoginInputFixture(),
@@ -112,9 +129,7 @@ describe('api bootstrap', () => {
   });
 
   it('serializa erros com code e correlation id', async () => {
-    const app = buildApp({ database: makeDatabaseStub() });
-
-    const response = await app.inject({
+    const response = await authEnvironment!.app.inject({
       method: 'POST',
       url: '/api/v1/auth/login',
       headers: {
@@ -134,5 +149,79 @@ describe('api bootstrap', () => {
         requestId: 'auth-error-123',
       },
     });
+  });
+
+  it('expira a sessao e retorna null no bootstrap autenticado', async () => {
+    const registerResponse = await authEnvironment!.app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/register',
+      payload: makeRegisterInputFixture(),
+    });
+
+    authEnvironment!.advanceTime(169 * 60 * 60 * 1000);
+
+    const sessionResponse = await authEnvironment!.app.inject({
+      method: 'GET',
+      url: '/api/v1/session',
+      headers: {
+        cookie: registerResponse.headers['set-cookie'] as string,
+      },
+    });
+
+    expect(sessionResponse.statusCode).toBe(200);
+    expect(sessionResponse.json()).toEqual({ session: null });
+  });
+
+  it('gera token de reset, redefine a senha e invalida a senha antiga', async () => {
+    await authEnvironment!.app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/register',
+      payload: makeRegisterInputFixture(),
+    });
+
+    const recoveryResponse = await authEnvironment!.app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/password-recovery',
+      payload: {
+        email: 'alexandre@example.com',
+      },
+    });
+
+    const recoveryPayload = recoveryResponse.json() as {
+      previewToken?: string | null;
+    };
+
+    expect(recoveryResponse.statusCode).toBe(200);
+    expect(recoveryPayload.previewToken).toBeTruthy();
+
+    const resetResponse = await authEnvironment!.app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/password-reset',
+      payload: {
+        password: 'nova-senha-123',
+        token: recoveryPayload.previewToken,
+      },
+    });
+
+    expect(resetResponse.statusCode).toBe(204);
+
+    const oldLoginResponse = await authEnvironment!.app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      payload: makeLoginInputFixture(),
+    });
+
+    expect(oldLoginResponse.statusCode).toBe(401);
+
+    const newLoginResponse = await authEnvironment!.app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      payload: {
+        email: 'alexandre@example.com',
+        password: 'nova-senha-123',
+      },
+    });
+
+    expect(newLoginResponse.statusCode).toBe(200);
   });
 });

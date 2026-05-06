@@ -4,6 +4,7 @@ import Fastify from 'fastify';
 import { randomUUID } from 'node:crypto';
 
 import { env } from './config';
+import { AuthService } from './lib/auth-service';
 import { createDatabaseClient, type DatabaseClient } from './lib/database';
 import { getErrorLogMessage, serializeError } from './lib/errors';
 import { authRoutes } from './routes/auth';
@@ -11,10 +12,14 @@ import { healthRoutes } from './routes/health';
 
 type BuildAppOptions = {
   database?: DatabaseClient;
+  now?: () => Date;
 };
 
 export function buildApp(options: BuildAppOptions = {}) {
   const database = options.database ?? createDatabaseClient();
+  const authService = new AuthService(database, {
+    now: options.now,
+  });
 
   const app = Fastify({
     genReqId(request) {
@@ -78,7 +83,7 @@ export function buildApp(options: BuildAppOptions = {}) {
   });
 
   app.register(healthRoutes(database));
-  app.register(authRoutes);
+  app.register(authRoutes(authService));
 
   return app;
 }

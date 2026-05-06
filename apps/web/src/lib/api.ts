@@ -1,8 +1,18 @@
-import type { LoginInput, RegisterInput, SessionPayload } from '@shf/contracts';
+import type {
+  LoginInput,
+  PasswordResetInput,
+  PasswordResetRequestInput,
+  PasswordResetRequestResult,
+  RegisterInput,
+  SessionPayload,
+} from '@shf/contracts';
 
 const apiBaseUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
 type ApiErrorPayload = {
+  error?: {
+    message?: string;
+  };
   message?: string;
 };
 
@@ -26,7 +36,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const errorPayload = data as ApiErrorPayload;
 
     throw new Error(
-      errorPayload.message ?? 'Nao foi possivel concluir a operacao.',
+      errorPayload.error?.message ??
+        errorPayload.message ??
+        'Nao foi possivel concluir a operacao.',
     );
   }
 
@@ -57,6 +69,20 @@ export const authApi = {
   logout(): Promise<void> {
     return request('/api/v1/auth/logout', {
       method: 'POST',
+    });
+  },
+  requestPasswordRecovery(
+    input: PasswordResetRequestInput,
+  ): Promise<PasswordResetRequestResult> {
+    return request('/api/v1/auth/password-recovery', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+  resetPassword(input: PasswordResetInput): Promise<void> {
+    return request('/api/v1/auth/password-reset', {
+      method: 'POST',
+      body: JSON.stringify(input),
     });
   },
 };

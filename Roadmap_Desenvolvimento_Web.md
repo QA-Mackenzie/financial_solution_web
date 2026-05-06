@@ -143,6 +143,8 @@ O time consegue clonar o novo repositorio, subir app e API localmente, conectar 
 
 ## Sprint 1 - Fundacao compartilhada, identidade e shell autenticado
 
+Status: concluida em 2026-05-06
+
 ### Objetivo
 
 Criar a base compartilhada de dominio/contratos e entregar o primeiro fluxo autenticado seguro da aplicacao web.
@@ -156,20 +158,39 @@ Criar a base compartilhada de dominio/contratos e entregar o primeiro fluxo aute
 
 ### Backlog recomendado
 
-- [ ] Extrair para package compartilhado os contratos reutilizaveis de contas, transacoes, contratos, cartoes, parcelamentos, provisoes, tags e horizonte
-- [ ] Portar para package compartilhado os modulos puros de dominio com maior estabilidade matematica e baixo acoplamento de infra
-- [ ] Migrar e adaptar os testes de dominio mais confiaveis para o novo repositorio
-- [ ] Modelar tabelas de users, sessions, password_reset_tokens, email_verification_tokens, consents e audit_logs
-- [ ] Implementar cadastro inicial, login, logout e renovacao de sessao
-- [ ] Implementar hashing forte de senha e cookies seguros com expiracao definida
-- [ ] Criar paginas de login, cadastro, recuperacao e reset de senha
-- [ ] Criar shell privada com navegacao basica, protecao de rotas e bootstrap do usuario autenticado
-- [ ] Registrar eventos minimos de auditoria para login, logout, reset e falhas de autenticacao
-- [ ] Cobrir auth com testes de integracao, casos de credencial invalida e expiracao de sessao
+- [x] Extrair para package compartilhado os contratos reutilizaveis de contas, transacoes, contratos, cartoes, parcelamentos, provisoes, tags e horizonte
+- [x] Portar para package compartilhado os modulos puros de dominio com maior estabilidade matematica e baixo acoplamento de infra
+- [x] Migrar e adaptar os testes de dominio mais confiaveis para o novo repositorio
+- [x] Modelar tabelas de users, sessions, password_reset_tokens, email_verification_tokens, consents e audit_logs
+- [x] Implementar cadastro inicial, login, logout e renovacao de sessao
+- [x] Implementar hashing forte de senha e cookies seguros com expiracao definida
+- [x] Criar paginas de login, cadastro, recuperacao e reset de senha
+- [x] Criar shell privada com navegacao basica, protecao de rotas e bootstrap do usuario autenticado
+- [x] Registrar eventos minimos de auditoria para login, logout, reset e falhas de autenticacao
+- [x] Cobrir auth com testes de integracao, casos de credencial invalida e expiracao de sessao
 
 ### Gate de saida
 
 Um usuario consegue criar conta, autenticar, encerrar sessao e acessar a shell privada da aplicacao sem expor dados ou rotas sem protecao.
+
+### Implementado nesta sprint
+
+- pacotes packages/contracts e packages/domain-core preenchidos com contratos compartilhados e modulos puros de contas, transacoes, contratos, cartoes, parcelamentos, provisoes, tags e horizonte
+- suite de regressao matematica portada para o workspace com 60 testes de dominio validados no novo pacote compartilhado
+- autenticacao persistente em PostgreSQL com tabelas auth.users, auth.sessions, auth.password_reset_tokens, auth.email_verification_tokens, auth.consents e auth.audit_logs
+- AuthService com hashing scrypt, renovacao de sessao, expiracao de cookie, reset de senha, token opaco para recuperacao e trilha minima de auditoria
+- API Fastify atualizada para cadastro, login, leitura de sessao, logout, recuperacao e reset de senha com contratos compartilhados
+- shell web autenticada com navegacao privada basica, resumo da sessao, cadastro com consentimento e rotas publicas para recuperacao/reset
+- fixtures e testes de frontend atualizados para o novo contrato de auth e para as rotas da shell autenticada
+
+### Validacao executada
+
+- npm run test --workspace @shf/api
+- npm run test --workspace @shf/domain-core
+- npm run test --workspace @shf/web
+- npm run check
+- npm run infra:up
+- npm run db:check
 
 ---
 

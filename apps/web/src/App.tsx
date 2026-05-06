@@ -5,6 +5,9 @@ import { AppShell } from './components/AppShell';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { PublicOnlyRoute } from './components/PublicOnlyRoute';
 import { AuthPage } from './features/auth/AuthPage';
+import { PasswordRecoveryPage } from './features/auth/PasswordRecoveryPage';
+import { PasswordResetPage } from './features/auth/PasswordResetPage';
+import { AccessPage } from './features/dashboard/AccessPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { queryClient } from './lib/query-client';
 
@@ -36,6 +39,22 @@ export function App() {
           />
           <Route
             element={
+              <PublicOnlyRoute>
+                <PasswordRecoveryPage />
+              </PublicOnlyRoute>
+            }
+            path="/esqueci-senha"
+          />
+          <Route
+            element={
+              <PublicOnlyRoute>
+                <PasswordResetPage />
+              </PublicOnlyRoute>
+            }
+            path="/redefinir-senha"
+          />
+          <Route
+            element={
               <ProtectedRoute>
                 <AppShell>
                   <DashboardPage />
@@ -43,6 +62,16 @@ export function App() {
               </ProtectedRoute>
             }
             path="/app"
+          />
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <AccessPage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+            path="/app/acesso"
           />
           <Route element={<Navigate replace to="/" />} path="*" />
         </Routes>
