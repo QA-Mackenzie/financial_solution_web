@@ -3,13 +3,20 @@ import type { FastifyPluginAsync } from 'fastify';
 import {
   archiveAccountInputSchema,
   createAccountInputSchema,
+  createContractAdjustmentInputSchema,
+  createContractInputSchema,
   createTransactionInputSchema,
   accountsSnapshotSchema,
   accountListItemSchema,
+  contractAdjustmentSchema,
+  contractSchema,
+  contractsSnapshotSchema,
+  endContractInputSchema,
   horizonSettingsSchema,
   horizonSnapshotSchema,
   manualTransactionSchema,
   transactionsSnapshotSchema,
+  updateContractInputSchema,
   updateHorizonSettingsInputSchema,
   updateAccountInputSchema,
   updateTransactionInputSchema,
@@ -42,6 +49,18 @@ const transactionsSnapshotResponseSchema = z.object({
   snapshot: transactionsSnapshotSchema,
 });
 
+const contractsSnapshotResponseSchema = z.object({
+  snapshot: contractsSnapshotSchema,
+});
+
+const contractResponseSchema = z.object({
+  contract: contractSchema,
+});
+
+const contractAdjustmentResponseSchema = z.object({
+  adjustment: contractAdjustmentSchema,
+});
+
 const horizonSnapshotResponseSchema = z.object({
   snapshot: horizonSnapshotSchema,
 });
@@ -49,6 +68,11 @@ const horizonSnapshotResponseSchema = z.object({
 const horizonSettingsResponseSchema = z.object({
   settings: horizonSettingsSchema,
 });
+
+const createContractAdjustmentBodySchema =
+  createContractAdjustmentInputSchema.omit({ contractId: true });
+
+const endContractBodySchema = endContractInputSchema.omit({ contractId: true });
 
 const idParamSchema = z.object({
   id: z.string().uuid('Identificador invalido.'),
@@ -82,6 +106,17 @@ export function financeRoutes(financeService: FinanceService): FastifyPluginAsyn
       return reply.send(accountsSnapshotResponseSchema.parse({ snapshot }));
     });
 
+    app.get('/api/v1/contracts', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const snapshot = await financeService.getContractsSnapshot(
+        authorizedSession.userId,
+      );
+
+      return reply.send(contractsSnapshotResponseSchema.parse({ snapshot }));
+    });
+
     app.post('/api/v1/accounts', async (request, reply) => {
       const authorizedSession = await financeService.requireAuthorizedSession(
         request.cookies[env.SESSION_COOKIE_NAME],
@@ -104,6 +139,30 @@ export function financeRoutes(financeService: FinanceService): FastifyPluginAsyn
       );
 
       return reply.code(201).send(accountResponseSchema.parse({ account }));
+    });
+
+    app.post('/api/v1/contracts', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const parsedBody = createContractInputSchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedBody.error.flatten(),
+        );
+      }
+
+      const contract = await financeService.createContract(
+        authorizedSession.userId,
+        parsedBody.data,
+        getRequestContext(request),
+      );
+
+      return reply.code(201).send(contractResponseSchema.parse({ contract }));
     });
 
     app.put('/api/v1/accounts/:id', async (request, reply) => {
@@ -144,6 +203,44 @@ export function financeRoutes(financeService: FinanceService): FastifyPluginAsyn
       return reply.send(accountResponseSchema.parse({ account }));
     });
 
+    app.put('/api/v1/contracts/:id', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const parsedParams = idParamSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedParams.error.flatten(),
+        );
+      }
+
+      const parsedBody = createContractInputSchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedBody.error.flatten(),
+        );
+      }
+
+      const contract = await financeService.updateContract(
+        authorizedSession.userId,
+        updateContractInputSchema.parse({
+          ...parsedBody.data,
+          id: parsedParams.data.id,
+        }),
+        getRequestContext(request),
+      );
+
+      return reply.send(contractResponseSchema.parse({ contract }));
+    });
+
     app.post('/api/v1/accounts/:id/archive', async (request, reply) => {
       const authorizedSession = await financeService.requireAuthorizedSession(
         request.cookies[env.SESSION_COOKIE_NAME],
@@ -166,6 +263,84 @@ export function financeRoutes(financeService: FinanceService): FastifyPluginAsyn
       );
 
       return reply.send(accountResponseSchema.parse({ account }));
+    });
+
+    app.post('/api/v1/contracts/:id/adjustments', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const parsedParams = idParamSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedParams.error.flatten(),
+        );
+      }
+
+      const parsedBody = createContractAdjustmentBodySchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedBody.error.flatten(),
+        );
+      }
+
+      const adjustment = await financeService.createContractAdjustment(
+        authorizedSession.userId,
+        createContractAdjustmentInputSchema.parse({
+          ...parsedBody.data,
+          contractId: parsedParams.data.id,
+        }),
+        getRequestContext(request),
+      );
+
+      return reply.code(201).send(
+        contractAdjustmentResponseSchema.parse({ adjustment }),
+      );
+    });
+
+    app.post('/api/v1/contracts/:id/end', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const parsedParams = idParamSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedParams.error.flatten(),
+        );
+      }
+
+      const parsedBody = endContractBodySchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedBody.error.flatten(),
+        );
+      }
+
+      const contract = await financeService.endContract(
+        authorizedSession.userId,
+        endContractInputSchema.parse({
+          ...parsedBody.data,
+          contractId: parsedParams.data.id,
+        }),
+        getRequestContext(request),
+      );
+
+      return reply.send(contractResponseSchema.parse({ contract }));
     });
 
     app.get('/api/v1/transactions', async (request, reply) => {

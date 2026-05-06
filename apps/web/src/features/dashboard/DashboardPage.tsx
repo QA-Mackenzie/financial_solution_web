@@ -14,6 +14,7 @@ import {
   formatMonthYear,
 } from '../../lib/finance-format';
 import {
+  useContractsSnapshotQuery,
   useHorizonSnapshotQuery,
   useUpdateHorizonSettingsMutation,
 } from '../finance/use-finance';
@@ -39,6 +40,7 @@ function getPrimaryRiskMonth(months: FinancialHorizonMonth[]) {
 
 export function DashboardPage() {
   const horizonSnapshotQuery = useHorizonSnapshotQuery();
+  const contractsSnapshotQuery = useContractsSnapshotQuery();
   const updateHorizonSettingsMutation = useUpdateHorizonSettingsMutation();
   const {
     handleSubmit,
@@ -54,6 +56,7 @@ export function DashboardPage() {
   const months = horizonSnapshotQuery.data?.horizon.months ?? [];
   const currentMonth = months[0] ?? null;
   const primaryRiskMonth = getPrimaryRiskMonth(months);
+  const recurringSummary = contractsSnapshotQuery.data;
 
   useEffect(() => {
     if (settings) {
@@ -71,9 +74,9 @@ export function DashboardPage() {
         <div className="eyebrow">Horizonte oficial</div>
         <h2>Horizonte oficial de 24 meses no backend.</h2>
         <p>
-          A Sprint 4 transforma o horizonte em um servico oficial do backend,
-          com classificacao de risco mensal, cache por usuario e dashboard
-          consumindo o payload auditavel da API.
+          O horizonte oficial agora combina saldo atual, historico recente e
+          contratos recorrentes com reajustes programados, mantendo a projecao
+          mensal auditavel diretamente no backend.
         </p>
         <small className="helper-text">
           Ultima geracao:{' '}
@@ -110,6 +113,32 @@ export function DashboardPage() {
             <strong>Margem configurada</strong>
             <span>
               {formatCurrencyInCents(settings?.safetyMarginInCents ?? 0)}
+            </span>
+          </div>
+        </div>
+      </article>
+
+      <article className="dashboard-card">
+        <h3>Recorrencias ativas</h3>
+        <div className="detail-list">
+          <div className="detail-item">
+            <strong>Contratos ativos</strong>
+            <span>{recurringSummary?.activeContracts.length ?? 0}</span>
+          </div>
+          <div className="detail-item">
+            <strong>Receitas recorrentes</strong>
+            <span>
+              {formatCurrencyInCents(
+                recurringSummary?.totalActiveIncomeInCents ?? 0,
+              )}
+            </span>
+          </div>
+          <div className="detail-item">
+            <strong>Despesas recorrentes</strong>
+            <span>
+              {formatCurrencyInCents(
+                -1 * (recurringSummary?.totalActiveExpenseInCents ?? 0),
+              )}
             </span>
           </div>
         </div>
@@ -183,8 +212,9 @@ export function DashboardPage() {
       <article className="dashboard-card">
         <h3>Proximas entregas</h3>
         <p>
-          Sprint 5 adiciona contratos recorrentes e reajustes para alimentar o
-          horizonte automaticamente com receitas e despesas fixas.
+          Contratos recorrentes ja alimentam o horizonte automaticamente. O
+          proximo passo evolutivo e ampliar a cobertura para cartoes,
+          parcelamentos e provisoes dentro do mesmo painel.
         </p>
       </article>
 

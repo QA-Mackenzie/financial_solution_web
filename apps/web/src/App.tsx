@@ -8,6 +8,7 @@ import { AccountsPage } from './features/accounts/AccountsPage';
 import { AuthPage } from './features/auth/AuthPage';
 import { PasswordRecoveryPage } from './features/auth/PasswordRecoveryPage';
 import { PasswordResetPage } from './features/auth/PasswordResetPage';
+import { ContractsPage } from './features/contracts/ContractsPage';
 import { AccessPage } from './features/dashboard/AccessPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { TransactionsPage } from './features/transactions/TransactionsPage';
@@ -84,6 +85,16 @@ export function App() {
               </ProtectedRoute>
             }
             path="/app/lancamentos"
+          />
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <ContractsPage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+            path="/app/contratos"
           />
           <Route
             element={

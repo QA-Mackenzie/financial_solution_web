@@ -1,8 +1,14 @@
 import type {
   Account,
   AccountsSnapshot,
+  Contract,
+  ContractAdjustment,
+  ContractsSnapshot,
   CreateAccountInput,
+  CreateContractAdjustmentInput,
+  CreateContractInput,
   CreateTransactionInput,
+  EndContractInput,
   HorizonSnapshot,
   LoginInput,
   ManualTransaction,
@@ -13,6 +19,7 @@ import type {
   SessionPayload,
   TransactionsSnapshot,
   UpdateAccountInput,
+  UpdateContractInput,
   UpdateHorizonSettingsInput,
   UpdateTransactionInput,
 } from '@shf/contracts';
@@ -142,6 +149,11 @@ export const financeApi = {
 
     return payload.snapshot;
   },
+  async getContractsSnapshot(): Promise<ContractsSnapshot> {
+    const payload = await request<{ snapshot: ContractsSnapshot }>('/api/v1/contracts');
+
+    return payload.snapshot;
+  },
   async updateHorizonSettings(
     input: UpdateHorizonSettingsInput,
   ): Promise<UpdateHorizonSettingsInput> {
@@ -154,6 +166,63 @@ export const financeApi = {
     );
 
     return payload.settings;
+  },
+  async createContract(input: CreateContractInput): Promise<Contract> {
+    const payload = await request<{ contract: Contract }>('/api/v1/contracts', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+
+    return payload.contract;
+  },
+  async updateContract(input: UpdateContractInput): Promise<Contract> {
+    const payload = await request<{ contract: Contract }>(
+      `/api/v1/contracts/${input.id}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          accountId: input.accountId,
+          name: input.name,
+          category: input.category,
+          type: input.type,
+          amountInCents: input.amountInCents,
+          dueDay: input.dueDay,
+          startDate: input.startDate,
+          status: input.status,
+        }),
+      },
+    );
+
+    return payload.contract;
+  },
+  async createContractAdjustment(
+    input: CreateContractAdjustmentInput,
+  ): Promise<ContractAdjustment> {
+    const payload = await request<{ adjustment: ContractAdjustment }>(
+      `/api/v1/contracts/${input.contractId}/adjustments`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          amountInCents: input.amountInCents,
+          effectiveStartDate: input.effectiveStartDate,
+        }),
+      },
+    );
+
+    return payload.adjustment;
+  },
+  async endContract(input: EndContractInput): Promise<Contract> {
+    const payload = await request<{ contract: Contract }>(
+      `/api/v1/contracts/${input.contractId}/end`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          endDate: input.endDate,
+        }),
+      },
+    );
+
+    return payload.contract;
   },
   async createTransaction(input: CreateTransactionInput): Promise<ManualTransaction> {
     const payload = await request<{ transaction: ManualTransaction }>(

@@ -4,19 +4,27 @@ import type {
   ArchiveAccountInput,
   Account,
   AccountListItem,
+  Contract,
+  ContractAdjustment,
+  ContractListItem,
   CreateAccountInput,
+  CreateContractAdjustmentInput,
+  CreateContractInput,
   CreateTagInput,
   CreateTransactionInput,
+  EndContractInput,
   HorizonSettings,
   ManualTransaction,
   Tag,
   TagListItem,
+  UpdateContractInput,
   UpdateAccountInput,
   UpdateTransactionInput,
   TransactionListItem,
 } from '@shf/contracts';
 import {
   sanitizeAccountInput,
+  sanitizeContractInput,
   sanitizeTagIds,
   sanitizeTagInput,
   sanitizeTransactionInput,
@@ -124,6 +132,32 @@ type ManualTransactionRow = QueryResultRow & {
   transaction_date: Date | string;
   type: ManualTransaction['type'];
   updated_at: Date | string;
+  user_id: string;
+};
+
+type ContractRow = QueryResultRow & {
+  account_id: string;
+  account_name?: string;
+  amount_in_cents: number | string;
+  category: string;
+  created_at: Date | string;
+  due_day: number | string;
+  end_date: Date | string | null;
+  id: string;
+  name: string;
+  start_date: Date | string;
+  status: Contract['status'];
+  type: Contract['type'];
+  updated_at: Date | string;
+  user_id: string;
+};
+
+type ContractAdjustmentRow = QueryResultRow & {
+  amount_in_cents: number | string;
+  contract_id: string;
+  created_at: Date | string;
+  effective_start_date: Date | string;
+  id: string;
   user_id: string;
 };
 
@@ -236,6 +270,25 @@ async function assertOwnedAccount(
   }
 }
 
+async function assertOwnedContract(
+  database: DatabaseExecutor,
+  userId: string,
+  contractId: string,
+): Promise<void> {
+  const result = await database.query<{ id: string }>(
+    'select id from finance.recurring_contracts where user_id = $1 and id = $2',
+    [userId, contractId],
+  );
+
+  if ((result.rowCount ?? 0) === 0) {
+    throw new AppError(
+      404,
+      'FINANCE_CONTRACT_NOT_FOUND',
+      'Contrato nao encontrado para o usuario autenticado.',
+    );
+  }
+}
+
 async function assertOwnedTags(
   database: DatabaseExecutor,
   userId: string,
@@ -344,6 +397,46 @@ function mapManualTransaction(row: ManualTransactionRow): ManualTransaction {
     transactionDate: toDateOnly(row.transaction_date),
     type: row.type,
     updatedAt: toIsoString(row.updated_at),
+  };
+}
+
+function mapContract(row: ContractRow): Contract {
+  return {
+    accountId: row.account_id,
+    amountInCents: toNumber(row.amount_in_cents),
+    category: row.category,
+    createdAt: toIsoString(row.created_at),
+    dueDay: toNumber(row.due_day),
+    endDate: row.end_date ? toDateOnly(row.end_date) : null,
+    id: row.id,
+    name: row.name,
+    startDate: toDateOnly(row.start_date),
+    status: row.status,
+    type: row.type,
+    updatedAt: toIsoString(row.updated_at),
+  };
+}
+
+function mapContractAdjustment(
+  row: ContractAdjustmentRow,
+): ContractAdjustment {
+  return {
+    amountInCents: toNumber(row.amount_in_cents),
+    contractId: row.contract_id,
+    createdAt: toIsoString(row.created_at),
+    effectiveStartDate: toDateOnly(row.effective_start_date),
+    id: row.id,
+  };
+}
+
+function mapContractListItem(
+  row: ContractRow,
+  adjustments: ContractAdjustment[] = [],
+): ContractListItem {
+  return {
+    ...mapContract(row),
+    accountName: row.account_name ?? '',
+    adjustments,
   };
 }
 
@@ -664,6 +757,323 @@ export class AccountsRepository {
     );
 
     return result.rows.map(mapAccountListItem);
+  }
+}
+
+export class ContractsRepository {
+  constructor(private readonly database: DatabaseClient) {}
+
+  async create(
+    userId: string,
+    input: CreateContractInput,
+    now = new Date(),
+    database: DatabaseExecutor = this.database,
+  ): Promise<Contract> {
+    const sanitizedInput = sanitizeContractInput(input);
+    const nowIsoString = now.toISOString();
+
+    await assertOwnedAccount(database, userId, sanitizedInput.accountId);
+
+    const result = await database.query<ContractRow>(
+      `insert into finance.recurring_contracts (
+         id,
+         user_id,
+         account_id,
+         name,
+         category,
+         type,
+         amount_in_cents,
+         due_day,
+         start_date,
+         end_date,
+         status,
+         payload,
+         created_at,
+         updated_at
+       ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, null, $10, $11, $12, $13)
+       returning id,
+                 user_id,
+                 account_id,
+                 name,
+                 category,
+                 type,
+                 amount_in_cents,
+                 due_day,
+                 start_date,
+                 end_date,
+                 status,
+                 created_at,
+                 updated_at`,
+      [
+        randomUUID(),
+        userId,
+        sanitizedInput.accountId,
+        sanitizedInput.name,
+        sanitizedInput.category,
+        sanitizedInput.type,
+        sanitizedInput.amountInCents,
+        sanitizedInput.dueDay,
+        sanitizedInput.startDate,
+        sanitizedInput.status,
+        JSON.stringify({}),
+        nowIsoString,
+        nowIsoString,
+      ],
+    );
+
+    return mapContract(result.rows[0]);
+  }
+
+  async update(
+    userId: string,
+    input: UpdateContractInput,
+    now = new Date(),
+    database: DatabaseExecutor = this.database,
+  ): Promise<Contract> {
+    const sanitizedInput = sanitizeContractInput(input);
+    const nowIsoString = now.toISOString();
+
+    await assertOwnedAccount(database, userId, sanitizedInput.accountId);
+
+    const result = await database.query<ContractRow>(
+      `update finance.recurring_contracts
+          set account_id = $3,
+              name = $4,
+              category = $5,
+              type = $6,
+              amount_in_cents = $7,
+              due_day = $8,
+              start_date = $9,
+              status = $10,
+              updated_at = $11
+        where user_id = $1 and id = $2
+        returning id,
+                  user_id,
+                  account_id,
+                  name,
+                  category,
+                  type,
+                  amount_in_cents,
+                  due_day,
+                  start_date,
+                  end_date,
+                  status,
+                  created_at,
+                  updated_at`,
+      [
+        userId,
+        sanitizedInput.id,
+        sanitizedInput.accountId,
+        sanitizedInput.name,
+        sanitizedInput.category,
+        sanitizedInput.type,
+        sanitizedInput.amountInCents,
+        sanitizedInput.dueDay,
+        sanitizedInput.startDate,
+        sanitizedInput.status,
+        nowIsoString,
+      ],
+    );
+
+    if ((result.rowCount ?? 0) === 0) {
+      throw new AppError(
+        404,
+        'FINANCE_CONTRACT_NOT_FOUND',
+        'Contrato nao encontrado para o usuario autenticado.',
+      );
+    }
+
+    return mapContract(result.rows[0]);
+  }
+
+  async createAdjustment(
+    userId: string,
+    input: CreateContractAdjustmentInput,
+    now = new Date(),
+    database: DatabaseExecutor = this.database,
+  ): Promise<ContractAdjustment> {
+    const nowIsoString = now.toISOString();
+
+    await assertOwnedContract(database, userId, input.contractId);
+
+    const result = await database.query<ContractAdjustmentRow>(
+      `insert into finance.recurring_contract_adjustments (
+         id,
+         user_id,
+         recurring_contract_id,
+         amount_in_cents,
+         effective_start_date,
+         payload,
+         created_at
+       ) values ($1, $2, $3, $4, $5, $6, $7)
+       returning id,
+                 user_id,
+                 recurring_contract_id as contract_id,
+                 amount_in_cents,
+                 effective_start_date,
+                 created_at`,
+      [
+        randomUUID(),
+        userId,
+        input.contractId,
+        input.amountInCents,
+        input.effectiveStartDate,
+        JSON.stringify({}),
+        nowIsoString,
+      ],
+    );
+
+    return mapContractAdjustment(result.rows[0]);
+  }
+
+  async end(
+    userId: string,
+    input: EndContractInput,
+    now = new Date(),
+    database: DatabaseExecutor = this.database,
+  ): Promise<Contract> {
+    const nowIsoString = now.toISOString();
+    const result = await database.query<ContractRow>(
+      `update finance.recurring_contracts
+          set end_date = $3,
+              updated_at = $4
+        where user_id = $1 and id = $2
+        returning id,
+                  user_id,
+                  account_id,
+                  name,
+                  category,
+                  type,
+                  amount_in_cents,
+                  due_day,
+                  start_date,
+                  end_date,
+                  status,
+                  created_at,
+                  updated_at`,
+      [userId, input.contractId, input.endDate, nowIsoString],
+    );
+
+    if ((result.rowCount ?? 0) === 0) {
+      throw new AppError(
+        404,
+        'FINANCE_CONTRACT_NOT_FOUND',
+        'Contrato nao encontrado para o usuario autenticado.',
+      );
+    }
+
+    return mapContract(result.rows[0]);
+  }
+
+  async findById(
+    userId: string,
+    contractId: string,
+    database: DatabaseExecutor = this.database,
+  ): Promise<ContractListItem | null> {
+    const result = await database.query<ContractRow>(
+      `select c.id,
+              c.user_id,
+              c.account_id,
+              a.name as account_name,
+              c.name,
+              c.category,
+              c.type,
+              c.amount_in_cents,
+              c.due_day,
+              c.start_date,
+              c.end_date,
+              c.status,
+              c.created_at,
+              c.updated_at
+         from finance.recurring_contracts c
+         inner join finance.accounts a
+           on a.user_id = c.user_id
+          and a.id = c.account_id
+        where c.user_id = $1 and c.id = $2`,
+      [userId, contractId],
+    );
+
+    const contractRow = result.rows[0];
+
+    if (!contractRow) {
+      return null;
+    }
+
+    const adjustments = await database.query<ContractAdjustmentRow>(
+      `select id,
+              user_id,
+              recurring_contract_id as contract_id,
+              amount_in_cents,
+              effective_start_date,
+              created_at
+         from finance.recurring_contract_adjustments
+        where user_id = $1 and recurring_contract_id = $2
+        order by effective_start_date asc, created_at asc, id asc`,
+      [userId, contractId],
+    );
+
+    return mapContractListItem(
+      contractRow,
+      adjustments.rows.map(mapContractAdjustment),
+    );
+  }
+
+  async listByUserId(userId: string): Promise<ContractListItem[]> {
+    const result = await this.database.query<ContractRow>(
+      `select c.id,
+              c.user_id,
+              c.account_id,
+              a.name as account_name,
+              c.name,
+              c.category,
+              c.type,
+              c.amount_in_cents,
+              c.due_day,
+              c.start_date,
+              c.end_date,
+              c.status,
+              c.created_at,
+              c.updated_at
+         from finance.recurring_contracts c
+         inner join finance.accounts a
+           on a.user_id = c.user_id
+          and a.id = c.account_id
+        where c.user_id = $1
+        order by c.status asc, c.due_day asc, c.name asc`,
+      [userId],
+    );
+
+    if (result.rows.length === 0) {
+      return [];
+    }
+
+    const contractIds = result.rows.map((row) => row.id);
+    const placeholders = contractIds.map((_, index) => `$${index + 2}`).join(', ');
+    const adjustments = await this.database.query<ContractAdjustmentRow>(
+      `select id,
+              user_id,
+              recurring_contract_id as contract_id,
+              amount_in_cents,
+              effective_start_date,
+              created_at
+         from finance.recurring_contract_adjustments
+        where user_id = $1 and recurring_contract_id in (${placeholders})
+        order by effective_start_date asc, created_at asc, id asc`,
+      [userId, ...contractIds],
+    );
+    const adjustmentsByContractId = adjustments.rows.reduce<
+      Map<string, ContractAdjustment[]>
+    >((map, row) => {
+      const contractAdjustments = map.get(row.contract_id) ?? [];
+      contractAdjustments.push(mapContractAdjustment(row));
+      map.set(row.contract_id, contractAdjustments);
+
+      return map;
+    }, new Map<string, ContractAdjustment[]>());
+
+    return result.rows.map((row) =>
+      mapContractListItem(row, adjustmentsByContractId.get(row.id) ?? []),
+    );
   }
 }
 
@@ -1143,6 +1553,8 @@ export class LegacyImportRepository {
 export class FinancialDataAccess {
   readonly accounts: AccountsRepository;
 
+  readonly contracts: ContractsRepository;
+
   readonly legacyImport: LegacyImportRepository;
 
   readonly manualTransactions: ManualTransactionsRepository;
@@ -1153,6 +1565,7 @@ export class FinancialDataAccess {
 
   constructor(database: DatabaseClient) {
     this.accounts = new AccountsRepository(database);
+    this.contracts = new ContractsRepository(database);
     this.legacyImport = new LegacyImportRepository(database);
     this.manualTransactions = new ManualTransactionsRepository(database);
     this.tags = new TagsRepository(database);
