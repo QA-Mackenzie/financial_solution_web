@@ -40,8 +40,9 @@ npm run check
 ## Ambiente local
 
 - o PostgreSQL local sobe via Docker Compose em infra/docker-compose.yml
-- o bootstrap do banco cria schema bootstrap e seeds minimos para validar a conexao
-- o comando npm run db:check valida conectividade, banco atual e quantidade de seeds
+- o bootstrap do banco cria schema bootstrap, auth, finance e legacy_import com seeds locais multiusuario
+- seeds locais disponiveis: alexandre@example.com e beatriz@example.com com a senha senha-segura-123
+- o comando npm run db:check valida conectividade, banco atual, usuarios seed, contas seed e lotes staged do importador legado
 
 ## Observabilidade inicial
 

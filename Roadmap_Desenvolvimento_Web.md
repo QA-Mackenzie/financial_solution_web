@@ -196,6 +196,8 @@ Um usuario consegue criar conta, autenticar, encerrar sessao e acessar a shell p
 
 ## Sprint 2 - Modelo de dados financeiro multiusuario e autorizacao
 
+Status: concluida em 2026-05-06
+
 ### Objetivo
 
 Preparar a base relacional do produto web com isolamento por usuario e autorizacao por recurso desde o inicio.
@@ -209,20 +211,40 @@ Preparar a base relacional do produto web com isolamento por usuario e autorizac
 
 ### Backlog recomendado
 
-- [ ] Modelar tabelas core com user_id: accounts, manual_transactions, recurring_contracts, recurring_contract_adjustments, credit_cards, credit_card_purchases, installment_plans, installment_operations, provisions, variable_expense_overrides, tags e tabelas M:N
-- [ ] Criar indices e constraints compostas por user_id onde antes existiam restricoes globais
-- [ ] Redesenhar app_settings para escopo por usuario
-- [ ] Implementar camada de repositorios ou data access para entidades base
-- [ ] Implementar middleware ou componente equivalente de autorizacao owner-based
-- [ ] Garantir que toda consulta e mutacao aplique escopo do usuario autenticado
-- [ ] Definir schema de auditoria para operacoes sensiveis de dominio
-- [ ] Criar fixtures e seeds de desenvolvimento com multiplos usuarios para testar isolamento
-- [ ] Criar prova de conceito do importador do SQLite legado para staging tables ou pipeline temporario
-- [ ] Cobrir com testes de integracao os cenarios de acesso indevido e cross-user leakage
+- [x] Modelar tabelas core com user_id: accounts, manual_transactions, recurring_contracts, recurring_contract_adjustments, credit_cards, credit_card_purchases, installment_plans, installment_operations, provisions, variable_expense_overrides, tags e tabelas M:N
+- [x] Criar indices e constraints compostas por user_id onde antes existiam restricoes globais
+- [x] Redesenhar app_settings para escopo por usuario
+- [x] Implementar camada de repositorios ou data access para entidades base
+- [x] Implementar middleware ou componente equivalente de autorizacao owner-based
+- [x] Garantir que toda consulta e mutacao aplique escopo do usuario autenticado
+- [x] Definir schema de auditoria para operacoes sensiveis de dominio
+- [x] Criar fixtures e seeds de desenvolvimento com multiplos usuarios para testar isolamento
+- [x] Criar prova de conceito do importador do SQLite legado para staging tables ou pipeline temporario
+- [x] Cobrir com testes de integracao os cenarios de acesso indevido e cross-user leakage
 
 ### Gate de saida
 
 A aplicacao possui base relacional segura, com isolamento por usuario comprovado por teste automatizado e pronta para receber os primeiros modulos funcionais.
+
+### Implementado nesta sprint
+
+- schema versionado 004-finance-schema.sql com finance.user_settings, accounts, manual_transactions, recurring_contracts, credit_cards, installment_plans, provisions, variable_expense_overrides, tabelas M:N de tags, schema audit.financial_events e schema legacy_import para staging do legado
+- constraints compostas por user_id + id e foreign keys compostas para impedir relacionamentos cruzados entre recursos de usuarios diferentes no proprio banco
+- camada owner-scoped em apps/api/src/lib/finance-repositories.ts com repositos base de configuracoes por usuario, contas, tags, lancamentos manuais e lotes staged do importador legado
+- componente equivalente de autorizacao owner-based em apps/api/src/lib/session-guard.ts para exigir sessao valida antes de operar recursos financeiros
+- seeds locais multiusuario em 005-finance-seed.sql com dois usuarios reais em auth.users, configuracoes por usuario, contas, tags, um lancamento inicial e um lote staged do importador legado
+- db:check ampliado para reportar usuarios seed, contas seed e lotes staged do importador legado
+- testes de integracao dedicados cobrindo isolamento por user_id, bloqueio de mutacao cruzada e ausencia de leakage entre usuarios
+
+### Validacao executada
+
+- npm run test --workspace @shf/api -- test/finance.test.ts
+- npm run test --workspace @shf/api
+- npm run test --workspace @shf/domain-core
+- npm run test --workspace @shf/web
+- npm run check
+- npm run infra:up
+- npm run db:check
 
 ---
 
