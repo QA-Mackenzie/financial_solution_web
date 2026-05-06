@@ -224,6 +224,10 @@ button {
   gap: 20px;
 }
 
+.dashboard-grid-horizon {
+  align-items: start;
+}
+
 .hero-card {
   grid-column: 1 / -1;
 }
@@ -268,6 +272,17 @@ button {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.06);
   color: #f5f1e8;
+}
+
+.helper-text {
+  color: rgba(245, 241, 232, 0.7);
+  line-height: 1.5;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .detail-list {
@@ -320,6 +335,70 @@ button {
   gap: 14px;
 }
 
+.horizon-list {
+  display: grid;
+  gap: 14px;
+}
+
+.horizon-list-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.horizon-list-card-healthy {
+  border-color: rgba(155, 231, 167, 0.45);
+}
+
+.horizon-list-card-attention {
+  border-color: rgba(255, 203, 119, 0.45);
+}
+
+.horizon-list-card-critical {
+  border-color: rgba(255, 180, 162, 0.5);
+}
+
+.horizon-list-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.horizon-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.risk-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 96px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.risk-pill-healthy {
+  background: rgba(155, 231, 167, 0.18);
+  color: #b8f5c0;
+}
+
+.risk-pill-attention {
+  background: rgba(255, 203, 119, 0.18);
+  color: #ffe3a8;
+}
+
+.risk-pill-critical {
+  background: rgba(255, 180, 162, 0.18);
+  color: #ffd3c7;
+}
+
 .entity-card {
   display: grid;
   gap: 14px;
@@ -370,6 +449,15 @@ button {
   }
 
   .section-heading-row {
+    display: grid;
+  }
+
+  .settings-grid,
+  .horizon-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .horizon-list-header {
     display: grid;
   }
 

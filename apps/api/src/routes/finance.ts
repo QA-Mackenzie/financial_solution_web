@@ -6,8 +6,11 @@ import {
   createTransactionInputSchema,
   accountsSnapshotSchema,
   accountListItemSchema,
+  horizonSettingsSchema,
+  horizonSnapshotSchema,
   manualTransactionSchema,
   transactionsSnapshotSchema,
+  updateHorizonSettingsInputSchema,
   updateAccountInputSchema,
   updateTransactionInputSchema,
 } from '@shf/contracts';
@@ -37,6 +40,14 @@ const transactionResponseSchema = z.object({
 
 const transactionsSnapshotResponseSchema = z.object({
   snapshot: transactionsSnapshotSchema,
+});
+
+const horizonSnapshotResponseSchema = z.object({
+  snapshot: horizonSnapshotSchema,
+});
+
+const horizonSettingsResponseSchema = z.object({
+  settings: horizonSettingsSchema,
 });
 
 const idParamSchema = z.object({
@@ -252,6 +263,46 @@ export function financeRoutes(financeService: FinanceService): FastifyPluginAsyn
       );
 
       return reply.code(204).send();
+    });
+
+    app.get('/api/v1/horizon', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const result = await financeService.getHorizonSnapshot(
+        authorizedSession.userId,
+      );
+
+      reply.header('server-timing', `horizon;dur=${result.durationInMs}`);
+      reply.header('x-horizon-cache', result.cacheStatus);
+      reply.header('x-horizon-generated-at', result.snapshot.generatedAt);
+
+      return reply.send(horizonSnapshotResponseSchema.parse({
+        snapshot: result.snapshot,
+      }));
+    });
+
+    app.put('/api/v1/horizon/settings', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const parsedBody = updateHorizonSettingsInputSchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedBody.error.flatten(),
+        );
+      }
+
+      const settings = await financeService.updateHorizonSettings(
+        authorizedSession.userId,
+        parsedBody.data,
+      );
+
+      return reply.send(horizonSettingsResponseSchema.parse({ settings }));
     });
   };
 }

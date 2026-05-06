@@ -3,6 +3,7 @@ import type {
   AccountsSnapshot,
   CreateAccountInput,
   CreateTransactionInput,
+  HorizonSnapshot,
   LoginInput,
   ManualTransaction,
   PasswordResetInput,
@@ -12,6 +13,7 @@ import type {
   SessionPayload,
   TransactionsSnapshot,
   UpdateAccountInput,
+  UpdateHorizonSettingsInput,
   UpdateTransactionInput,
 } from '@shf/contracts';
 
@@ -134,6 +136,24 @@ export const financeApi = {
     );
 
     return payload.snapshot;
+  },
+  async getHorizonSnapshot(): Promise<HorizonSnapshot> {
+    const payload = await request<{ snapshot: HorizonSnapshot }>('/api/v1/horizon');
+
+    return payload.snapshot;
+  },
+  async updateHorizonSettings(
+    input: UpdateHorizonSettingsInput,
+  ): Promise<UpdateHorizonSettingsInput> {
+    const payload = await request<{ settings: UpdateHorizonSettingsInput }>(
+      '/api/v1/horizon/settings',
+      {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      },
+    );
+
+    return payload.settings;
   },
   async createTransaction(input: CreateTransactionInput): Promise<ManualTransaction> {
     const payload = await request<{ transaction: ManualTransaction }>(

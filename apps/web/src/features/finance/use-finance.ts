@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   CreateAccountInput,
   CreateTransactionInput,
+  UpdateHorizonSettingsInput,
   UpdateAccountInput,
   UpdateTransactionInput,
 } from '@shf/contracts';
@@ -9,11 +10,13 @@ import type {
 import { financeApi } from '../../lib/api';
 
 export const accountsSnapshotQueryKey = ['finance', 'accounts', 'snapshot'];
+export const horizonSnapshotQueryKey = ['finance', 'horizon', 'snapshot'];
 export const transactionsSnapshotQueryKey = ['finance', 'transactions', 'snapshot'];
 
 async function invalidateFinancialQueries(queryClient: ReturnType<typeof useQueryClient>) {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: accountsSnapshotQueryKey }),
+    queryClient.invalidateQueries({ queryKey: horizonSnapshotQueryKey }),
     queryClient.invalidateQueries({ queryKey: transactionsSnapshotQueryKey }),
   ]);
 }
@@ -29,6 +32,13 @@ export function useTransactionsSnapshotQuery() {
   return useQuery({
     queryFn: financeApi.getTransactionsSnapshot,
     queryKey: transactionsSnapshotQueryKey,
+  });
+}
+
+export function useHorizonSnapshotQuery() {
+  return useQuery({
+    queryFn: financeApi.getHorizonSnapshot,
+    queryKey: horizonSnapshotQueryKey,
   });
 }
 
@@ -82,6 +92,16 @@ export function useDeleteTransactionMutation() {
 
   return useMutation({
     mutationFn: (id: string) => financeApi.deleteTransaction(id),
+    onSuccess: async () => invalidateFinancialQueries(queryClient),
+  });
+}
+
+export function useUpdateHorizonSettingsMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: UpdateHorizonSettingsInput) =>
+      financeApi.updateHorizonSettings(input),
     onSuccess: async () => invalidateFinancialQueries(queryClient),
   });
 }

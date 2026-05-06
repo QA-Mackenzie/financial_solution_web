@@ -1,5 +1,10 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import type { AccountsSnapshot, SessionPayload, TransactionsSnapshot } from '@shf/contracts';
+import type {
+  AccountsSnapshot,
+  HorizonSnapshot,
+  SessionPayload,
+  TransactionsSnapshot,
+} from '@shf/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from './App';
@@ -24,15 +29,23 @@ function mockAuthenticatedShellResponses() {
     expiresAt: '2026-01-08T12:00:00.000Z',
     issuedAt: '2026-01-01T12:00:00.000Z',
   };
-  const accountsSnapshot: AccountsSnapshot = {
-    activeAccounts: [],
-    archivedAccounts: [],
-    consolidatedBalanceInCents: 0,
-  };
-  const transactionsSnapshot: TransactionsSnapshot = {
-    totalExpenseInCents: 0,
-    totalIncomeInCents: 0,
-    transactions: [],
+  const horizonSnapshot: HorizonSnapshot = {
+    generatedAt: '2026-05-06T12:00:00.000Z',
+    settings: {
+      safetyMarginInCents: 50000,
+      variableExpenseWindowInMonths: 3,
+    },
+    horizon: {
+      months: Array.from({ length: 24 }, (_unused, index) => ({
+        id: `2026-${String(index + 5).padStart(2, '0')}`,
+        monthStart: `2026-${String(((index + 4) % 12) + 1).padStart(2, '0')}-01`,
+        openingBalanceInCents: 0,
+        incomeInCents: 0,
+        expenseInCents: 0,
+        closingBalanceInCents: 0,
+        riskLevel: 'critical' as const,
+      })),
+    },
   };
 
   return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
@@ -43,12 +56,8 @@ function mockAuthenticatedShellResponses() {
       return mockJsonResponse({ session });
     }
 
-    if (pathname === '/api/v1/accounts') {
-      return mockJsonResponse({ snapshot: accountsSnapshot });
-    }
-
-    if (pathname === '/api/v1/transactions') {
-      return mockJsonResponse({ snapshot: transactionsSnapshot });
+    if (pathname === '/api/v1/horizon') {
+      return mockJsonResponse({ snapshot: horizonSnapshot });
     }
 
     return mockJsonResponse({});
@@ -88,7 +97,23 @@ function mockInteractiveFinanceFlow() {
       createdAt: string;
       updatedAt: string;
     }>,
+    settings: {
+      safetyMarginInCents: 50000,
+      variableExpenseWindowInMonths: 3,
+    },
   };
+
+  function classifyRisk(closingBalanceInCents: number, safetyMarginInCents: number) {
+    if (closingBalanceInCents < 0) {
+      return 'critical' as const;
+    }
+
+    if (closingBalanceInCents <= safetyMarginInCents) {
+      return 'attention' as const;
+    }
+
+    return 'healthy' as const;
+  }
 
   function buildAccountsSnapshot(): AccountsSnapshot {
     const activeAccounts = state.accounts
@@ -145,6 +170,60 @@ function mockInteractiveFinanceFlow() {
         .filter((transaction) => transaction.type === 'income')
         .reduce((sum, transaction) => sum + transaction.amountInCents, 0),
       transactions,
+    };
+  }
+
+  function buildHorizonSnapshot(): HorizonSnapshot {
+    const accountsSnapshot = buildAccountsSnapshot();
+    const transactionsSnapshot = buildTransactionsSnapshot();
+    const currentMonthKey = '2026-05';
+    const openingBalanceInCents = accountsSnapshot.activeAccounts.reduce(
+      (sum, account) => sum + account.openingBalanceInCents,
+      0,
+    );
+    const currentMonthIncomeInCents = transactionsSnapshot.transactions
+      .filter(
+        (transaction) =>
+          transaction.type === 'income' &&
+          transaction.transactionDate.startsWith(currentMonthKey),
+      )
+      .reduce((sum, transaction) => sum + transaction.amountInCents, 0);
+    const currentMonthExpenseInCents = transactionsSnapshot.transactions
+      .filter(
+        (transaction) =>
+          transaction.type === 'expense' &&
+          transaction.transactionDate.startsWith(currentMonthKey),
+      )
+      .reduce((sum, transaction) => sum + transaction.amountInCents, 0);
+    const currentClosingBalanceInCents =
+      openingBalanceInCents + currentMonthIncomeInCents - currentMonthExpenseInCents;
+    const months = Array.from({ length: 24 }, (_unused, index) => {
+      const absoluteMonthIndex = 4 + index;
+      const year = 2026 + Math.floor(absoluteMonthIndex / 12);
+      const monthIndex = absoluteMonthIndex % 12;
+      const monthStart = `${String(year).padStart(4, '0')}-${String(monthIndex + 1).padStart(2, '0')}-01`;
+      const opening = index === 0 ? openingBalanceInCents : currentClosingBalanceInCents;
+      const income = index === 0 ? currentMonthIncomeInCents : 0;
+      const expense = index === 0 ? currentMonthExpenseInCents : 0;
+      const closing = index === 0 ? currentClosingBalanceInCents : currentClosingBalanceInCents;
+
+      return {
+        id: monthStart.slice(0, 7),
+        monthStart,
+        openingBalanceInCents: opening,
+        incomeInCents: income,
+        expenseInCents: expense,
+        closingBalanceInCents: closing,
+        riskLevel: classifyRisk(closing, state.settings.safetyMarginInCents),
+      };
+    });
+
+    return {
+      generatedAt: '2026-05-06T13:00:00.000Z',
+      settings: state.settings,
+      horizon: {
+        months,
+      },
     };
   }
 
@@ -216,6 +295,21 @@ function mockInteractiveFinanceFlow() {
       return mockJsonResponse({ transaction });
     }
 
+    if (pathname === '/api/v1/horizon' && method === 'GET') {
+      return mockJsonResponse({ snapshot: buildHorizonSnapshot() });
+    }
+
+    if (pathname === '/api/v1/horizon/settings' && method === 'PUT') {
+      const payload = JSON.parse(String(init?.body)) as {
+        safetyMarginInCents: number;
+        variableExpenseWindowInMonths: number;
+      };
+
+      state.settings = payload;
+
+      return mockJsonResponse({ settings: payload });
+    }
+
     return mockJsonResponse({});
   });
 }
@@ -253,10 +347,12 @@ describe('App', () => {
     await waitFor(() => {
       expect(
         screen.getByRole('heading', {
-          name: 'Saldo atual, contas e lancamentos manuais prontos.',
+          name: 'Horizonte oficial de 24 meses no backend.',
         }),
       ).toBeInTheDocument();
     });
+
+    expect(screen.getByText('Margem de seguranca em centavos')).toBeInTheDocument();
   });
 
   it('executa o fluxo financeiro principal na shell web', async () => {
@@ -338,21 +434,18 @@ describe('App', () => {
 
     await waitFor(() => {
       const saldoCard = screen
-        .getByRole('heading', { name: 'Saldo consolidado' })
+        .getByRole('heading', { name: 'Fechamento do mes atual' })
         .closest('article');
-      const movimentacaoCard = screen
-        .getByRole('heading', { name: 'Movimentacao atual' })
+      const riscoCard = screen
+        .getByRole('heading', { name: 'Principal risco do horizonte' })
         .closest('article');
 
       expect(saldoCard).not.toBeNull();
-      expect(movimentacaoCard).not.toBeNull();
+      expect(riscoCard).not.toBeNull();
 
       expect(within(saldoCard as HTMLElement).getByText(/2\.500,00/)).toBeInTheDocument();
       expect(
-        within(movimentacaoCard as HTMLElement).getByText(/2\.000,00/),
-      ).toBeInTheDocument();
-      expect(
-        within(movimentacaoCard as HTMLElement).getByText(/500,00/),
+        within(riscoCard as HTMLElement).getByText(/500,00/),
       ).toBeInTheDocument();
     });
   });

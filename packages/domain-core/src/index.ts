@@ -24,6 +24,7 @@ export * from './creditCards/creditCardBilling';
 export * from './creditCards/creditCardInput';
 export * from './creditCards/creditCardPurchaseInput';
 export * from './horizon/financialHorizon';
+export * from './horizon/financialHorizon.fixtures';
 export * from './installments/installmentCardProjection';
 export * from './installments/installmentInput';
 export * from './installments/installmentSchedule';

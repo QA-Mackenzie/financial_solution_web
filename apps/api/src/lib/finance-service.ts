@@ -1,5 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
+import {
+  DEFAULT_HORIZON_SAFETY_MARGIN_IN_CENTS,
+  DEFAULT_VARIABLE_EXPENSE_WINDOW_IN_MONTHS,
+} from '@shf/contracts';
 import type {
   Account,
   AccountListItem,
@@ -7,8 +11,11 @@ import type {
   ArchiveAccountInput,
   CreateAccountInput,
   CreateTransactionInput,
+  HorizonSettings,
+  HorizonSnapshot,
   ManualTransaction,
   TransactionsSnapshot,
+  UpdateHorizonSettingsInput,
   UpdateAccountInput,
   UpdateTransactionInput,
 } from '@shf/contracts';
@@ -24,6 +31,7 @@ import {
 import type { DatabaseClient, DatabaseExecutor } from './database';
 import { AppError } from './errors';
 import { FinancialDataAccess } from './finance-repositories';
+import { buildOfficialHorizonSnapshot } from './horizon-snapshot';
 import { SessionGuard, type AuthorizedSession } from './session-guard';
 
 export type FinanceRequestContext = {
@@ -42,12 +50,25 @@ type FinancialAuditAction =
 
 type FinancialAuditResourceType = 'account' | 'manual_transaction';
 
+type HorizonCacheEntry = {
+  referenceDate: string;
+  snapshot: HorizonSnapshot;
+};
+
+export type HorizonSnapshotResult = {
+  cacheStatus: 'hit' | 'miss';
+  durationInMs: number;
+  snapshot: HorizonSnapshot;
+};
+
 export class FinanceService {
   private readonly dataAccess: FinancialDataAccess;
+  private readonly horizonCache = new Map<string, HorizonCacheEntry>();
 
   constructor(
     private readonly database: DatabaseClient,
     private readonly sessionGuard: SessionGuard,
+    private readonly now: () => Date = () => new Date(),
   ) {
     this.dataAccess = new FinancialDataAccess(database);
   }
@@ -98,11 +119,11 @@ export class FinanceService {
       throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', issues);
     }
 
-    return this.database.runInTransaction(async (transaction) => {
+    const account = await this.database.runInTransaction(async (transaction) => {
       const account = await this.dataAccess.accounts.create(
         userId,
         sanitizedInput,
-        new Date(),
+        this.now(),
         transaction,
       );
 
@@ -121,6 +142,10 @@ export class FinanceService {
 
       return account;
     });
+
+    this.invalidateHorizonCache(userId);
+
+    return account;
   }
 
   async updateAccount(
@@ -135,11 +160,11 @@ export class FinanceService {
       throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', issues);
     }
 
-    return this.database.runInTransaction(async (transaction) => {
+    const account = await this.database.runInTransaction(async (transaction) => {
       const account = await this.dataAccess.accounts.update(
         userId,
         sanitizedInput,
-        new Date(),
+        this.now(),
         transaction,
       );
 
@@ -158,6 +183,10 @@ export class FinanceService {
 
       return account;
     });
+
+    this.invalidateHorizonCache(userId);
+
+    return account;
   }
 
   async archiveAccount(
@@ -165,11 +194,11 @@ export class FinanceService {
     input: ArchiveAccountInput,
     context: FinanceRequestContext,
   ): Promise<Account> {
-    return this.database.runInTransaction(async (transaction) => {
+    const account = await this.database.runInTransaction(async (transaction) => {
       const account = await this.dataAccess.accounts.archive(
         userId,
         input,
-        new Date(),
+        this.now(),
         transaction,
       );
 
@@ -187,12 +216,80 @@ export class FinanceService {
 
       return account;
     });
+
+    this.invalidateHorizonCache(userId);
+
+    return account;
   }
 
   async listTransactions(userId: string): Promise<TransactionsSnapshot> {
     const transactions = await this.dataAccess.manualTransactions.listByUserId(userId);
 
     return buildTransactionsSnapshot(transactions);
+  }
+
+  async getHorizonSettings(userId: string): Promise<HorizonSettings> {
+    return (await this.getOrCreateUserSettings(userId)).horizonSettings;
+  }
+
+  async updateHorizonSettings(
+    userId: string,
+    input: UpdateHorizonSettingsInput,
+  ): Promise<HorizonSettings> {
+    const currentSettings = await this.dataAccess.userSettings.getByUserId(userId);
+    const updatedSettings = await this.dataAccess.userSettings.upsert(
+      userId,
+      {
+        currencyCode: currentSettings?.currencyCode,
+        locale: currentSettings?.locale,
+        horizonSettings: input,
+      },
+      this.now(),
+    );
+
+    this.invalidateHorizonCache(userId);
+
+    return updatedSettings.horizonSettings;
+  }
+
+  async getHorizonSnapshot(userId: string): Promise<HorizonSnapshotResult> {
+    const startedAt = Date.now();
+    const now = this.now();
+    const generatedAt = now.toISOString();
+    const referenceDate = generatedAt.slice(0, 10);
+    const cachedSnapshot = this.horizonCache.get(userId);
+
+    if (cachedSnapshot && cachedSnapshot.referenceDate === referenceDate) {
+      return {
+        cacheStatus: 'hit',
+        durationInMs: Date.now() - startedAt,
+        snapshot: cachedSnapshot.snapshot,
+      };
+    }
+
+    const settings = await this.getHorizonSettings(userId);
+    const [accountsSnapshot, transactionsSnapshot] = await Promise.all([
+      this.getAccountsSnapshot(userId),
+      this.listTransactions(userId),
+    ]);
+    const snapshot = buildOfficialHorizonSnapshot({
+      accountsSnapshot,
+      generatedAt,
+      referenceDate,
+      settings,
+      transactionsSnapshot,
+    });
+
+    this.horizonCache.set(userId, {
+      referenceDate,
+      snapshot,
+    });
+
+    return {
+      cacheStatus: 'miss',
+      durationInMs: Date.now() - startedAt,
+      snapshot,
+    };
   }
 
   async createTransaction(
@@ -207,11 +304,11 @@ export class FinanceService {
       throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', issues);
     }
 
-    return this.database.runInTransaction(async (transaction) => {
+    const createdTransaction = await this.database.runInTransaction(async (transaction) => {
       const createdTransaction = await this.dataAccess.manualTransactions.create(
         userId,
         sanitizedInput,
-        new Date(),
+        this.now(),
         transaction,
       );
 
@@ -230,6 +327,10 @@ export class FinanceService {
 
       return createdTransaction;
     });
+
+    this.invalidateHorizonCache(userId);
+
+    return createdTransaction;
   }
 
   async updateTransaction(
@@ -244,11 +345,11 @@ export class FinanceService {
       throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', issues);
     }
 
-    return this.database.runInTransaction(async (transaction) => {
+    const updatedTransaction = await this.database.runInTransaction(async (transaction) => {
       const updatedTransaction = await this.dataAccess.manualTransactions.update(
         userId,
         sanitizedInput,
-        new Date(),
+        this.now(),
         transaction,
       );
 
@@ -267,6 +368,10 @@ export class FinanceService {
 
       return updatedTransaction;
     });
+
+    this.invalidateHorizonCache(userId);
+
+    return updatedTransaction;
   }
 
   async deleteTransaction(
@@ -294,6 +399,32 @@ export class FinanceService {
         },
       );
     });
+
+    this.invalidateHorizonCache(userId);
+  }
+
+  private async getOrCreateUserSettings(userId: string) {
+    const currentSettings = await this.dataAccess.userSettings.getByUserId(userId);
+
+    if (currentSettings) {
+      return currentSettings;
+    }
+
+    return this.dataAccess.userSettings.upsert(
+      userId,
+      {
+        horizonSettings: {
+          safetyMarginInCents: DEFAULT_HORIZON_SAFETY_MARGIN_IN_CENTS,
+          variableExpenseWindowInMonths:
+            DEFAULT_VARIABLE_EXPENSE_WINDOW_IN_MONTHS,
+        },
+      },
+      this.now(),
+    );
+  }
+
+  private invalidateHorizonCache(userId: string) {
+    this.horizonCache.delete(userId);
   }
 
   private async insertAuditEvent(
@@ -328,7 +459,7 @@ export class FinanceService {
           ipAddress: context.ipAddress,
           userAgent: context.userAgent,
         }),
-        new Date().toISOString(),
+        this.now().toISOString(),
       ],
     );
   }
