@@ -24,7 +24,11 @@ export function buildApp(options: BuildAppOptions = {}) {
     now: options.now,
   });
   const sessionGuard = new SessionGuard(authService);
-  const financeService = new FinanceService(database, sessionGuard);
+  const financeService = new FinanceService(
+    database,
+    sessionGuard,
+    options.now,
+  );
 
   const app = Fastify({
     genReqId(request) {

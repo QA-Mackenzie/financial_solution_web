@@ -311,6 +311,8 @@ O usuario consegue montar sua base financeira atual na web e o sistema responde 
 
 ## Sprint 4 - Horizonte oficial no backend e dashboard base
 
+Status: concluida em 2026-05-06
+
 ### Objetivo
 
 Transformar o horizonte em calculo oficial de backend e entregar a principal proposta de valor da aplicacao web.
@@ -324,20 +326,45 @@ Transformar o horizonte em calculo oficial de backend e entregar a principal pro
 
 ### Backlog recomendado
 
-- [ ] Portar o motor de financialHorizon para a nova arquitetura sem dependencia de renderer
-- [ ] Criar servico de orquestracao do horizonte no backend usando contas e lancamentos ja implementados
-- [ ] Implementar configuracoes por usuario para margem de seguranca e janela de media movel
-- [ ] Criar endpoint de leitura do horizonte com breakdown mensal e classificacao de risco
-- [ ] Criar dashboard web base para exibir 24 meses, saldos, entradas, saidas e status healthy/attention/critical
-- [ ] Implementar cache estrategico e instrumentacao de performance para leitura do horizonte
-- [ ] Reaproveitar fixtures do dominio atual para testes de regressao
-- [ ] Validar equivalencia matematica entre cenarios do desktop e do backend web para o escopo ja migrado
-- [ ] Criar testes de contrato de API para payload do horizonte
-- [ ] Documentar que o calculo oficial do horizonte passa a residir no backend
+- [x] Portar o motor de financialHorizon para a nova arquitetura sem dependencia de renderer
+- [x] Criar servico de orquestracao do horizonte no backend usando contas e lancamentos ja implementados
+- [x] Implementar configuracoes por usuario para margem de seguranca e janela de media movel
+- [x] Criar endpoint de leitura do horizonte com breakdown mensal e classificacao de risco
+- [x] Criar dashboard web base para exibir 24 meses, saldos, entradas, saidas e status healthy/attention/critical
+- [x] Implementar cache estrategico e instrumentacao de performance para leitura do horizonte
+- [x] Reaproveitar fixtures do dominio atual para testes de regressao
+- [x] Validar equivalencia matematica entre cenarios do desktop e do backend web para o escopo ja migrado
+- [x] Criar testes de contrato de API para payload do horizonte
+- [x] Documentar que o calculo oficial do horizonte passa a residir no backend
 
 ### Gate de saida
 
 O horizonte deixa de ser logica acoplada a UI e passa a ser um servico oficial, auditavel e testado da versao web.
+
+### Implementado nesta sprint
+
+- contratos compartilhados de horizonte expandidos com schemas Zod para meses, snapshot oficial, settings e update das configuracoes por usuario
+- helper oficial de orquestracao do horizonte no backend combinando contas, lancamentos manuais e projecao de despesas variaveis por media movel
+- FinanceService atualizado para entregar o snapshot oficial do horizonte, persistir/recuperar horizonSettings por usuario e invalidar cache em mutacoes financeiras
+- endpoints GET /api/v1/horizon e PUT /api/v1/horizon/settings com classificacao mensal de risco, headers de cache/performance e payload validado por contrato
+- dashboard web migrado para consumir exclusivamente o horizonte oficial do backend, exibindo 24 meses, fechamento mensal, principal risco e formulario de configuracao
+- cache in-memory por usuario para o horizonte do dia com instrumentacao via headers x-horizon-cache, x-horizon-generated-at e server-timing
+- testes de regressao reutilizando as fixtures oficiais do dominio e testes HTTP de contrato cobrindo cache, settings e projecao futura
+
+### Calculo oficial do horizonte
+
+- o horizonte deixa de ser responsabilidade da interface e passa a ser calculado no backend como snapshot oficial por usuario
+- a shell web consome apenas o payload oficial do endpoint de horizonte para renderizar meses, riscos e configuracoes
+- a margem de seguranca e a janela da media movel ficam persistidas por usuario em finance.user_settings
+
+### Validacao executada
+
+- npm run test --workspace @shf/api -- test/horizon-projection.test.ts test/horizon-routes.test.ts
+- npm run test --workspace @shf/web
+- npm run test --workspace @shf/api
+- npm run check
+- npm run infra:up
+- npm run db:check
 
 ---
 
