@@ -1,0 +1,52 @@
+import { QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+
+import { AppShell } from './components/AppShell';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { PublicOnlyRoute } from './components/PublicOnlyRoute';
+import { AuthPage } from './features/auth/AuthPage';
+import { DashboardPage } from './features/dashboard/DashboardPage';
+import { queryClient } from './lib/query-client';
+
+function LandingPage() {
+  return <Navigate replace to="/app" />;
+}
+
+export function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<LandingPage />} path="/" />
+          <Route
+            element={
+              <PublicOnlyRoute>
+                <AuthPage mode="login" />
+              </PublicOnlyRoute>
+            }
+            path="/login"
+          />
+          <Route
+            element={
+              <PublicOnlyRoute>
+                <AuthPage mode="register" />
+              </PublicOnlyRoute>
+            }
+            path="/cadastro"
+          />
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <DashboardPage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+            path="/app"
+          />
+          <Route element={<Navigate replace to="/" />} path="*" />
+        </Routes>
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
+}

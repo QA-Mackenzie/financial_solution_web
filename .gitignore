@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.turbo/
+.vite/
+.DS_Store
+*.log
+.env
+.env.local
+.env.*.local
+apps/*/dist/
+packages/*/dist/
+Solucao_Financeira/

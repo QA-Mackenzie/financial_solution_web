@@ -1,0 +1,26 @@
+{
+  "name": "@shf/api",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/server.js",
+  "types": "./dist/server.d.ts",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsup src/server.ts --format cjs --dts --clean",
+    "db:check": "tsx src/scripts/check-db.ts",
+    "typecheck": "tsc --project tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.15.1"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/cors": "^11.0.1",
+    "@shf/contracts": "0.1.0",
+    "@shf/domain-core": "0.1.0",
+    "fastify": "^5.3.3",
+    "pg": "^8.16.3",
+    "zod": "^3.24.4"
+  }
+}
