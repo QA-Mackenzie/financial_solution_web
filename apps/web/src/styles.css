@@ -218,6 +218,10 @@ button {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.panel-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -261,9 +265,87 @@ button {
   gap: 8px;
 }
 
+.finance-form fieldset {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.finance-form legend {
+  margin-bottom: 4px;
+  padding: 0;
+  font-weight: 700;
+}
+
 .finance-form small {
   min-height: 18px;
   color: #ffd3b6;
+}
+
+.filter-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.filter-grid label {
+  display: grid;
+  gap: 8px;
+}
+
+.filter-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.tag-checklist {
+  display: grid;
+  gap: 10px;
+}
+
+.tag-checklist-grid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.tag-check-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tag-check-item input {
+  margin: 0;
+}
+
+.tag-checklist-empty {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(245, 241, 232, 0.76);
+}
+
+.tag-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tag-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 203, 119, 0.18);
+  color: #fff4df;
+  font-size: 0.85rem;
+}
+
+.tag-badge-muted {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(245, 241, 232, 0.74);
 }
 
 .ghost-button {
@@ -521,6 +603,7 @@ button {
   }
 
   .panel-grid-2,
+  .panel-grid-3,
   .section-heading-row {
     grid-template-columns: 1fr;
   }
@@ -530,8 +613,10 @@ button {
   }
 
   .settings-grid,
+  .filter-grid-3,
   .horizon-metrics,
-  .stats-grid-inline {
+  .stats-grid-inline,
+  .tag-checklist-grid {
     grid-template-columns: 1fr;
   }
 

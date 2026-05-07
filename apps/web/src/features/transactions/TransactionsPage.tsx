@@ -1,14 +1,21 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import type { CreateTransactionInput, TransactionListItem } from '@shf/contracts';
-import { createTransactionInputSchema } from '@shf/contracts';
+import type { ChangeEvent } from 'react';
+import {
+  createTransactionInputSchema,
+  DEFAULT_UNCATEGORIZED_CATEGORY,
+  initialCategoryDefinitions,
+  type CreateTransactionInput,
+  type TransactionListItem,
+} from '@shf/contracts';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 
 import { formatCurrencyInCents, formatDate } from '../../lib/finance-format';
-import { useAccountsSnapshotQuery } from '../finance/use-finance';
 import {
+  useAccountsSnapshotQuery,
   useCreateTransactionMutation,
   useDeleteTransactionMutation,
+  useTagsSnapshotQuery,
   useTransactionsSnapshotQuery,
   useUpdateTransactionMutation,
 } from '../finance/use-finance';
@@ -16,15 +23,42 @@ import {
 const transactionDefaultValues: CreateTransactionInput = {
   accountId: '',
   amountInCents: 0,
-  category: '',
+  category: DEFAULT_UNCATEGORIZED_CATEGORY,
   description: '',
+  tagIds: [],
   transactionDate: new Date().toISOString().slice(0, 10),
   type: 'expense',
 };
 
+type TransactionFilterState = {
+  accountId: string;
+  category: string;
+  fromDate: string;
+  tagId: string;
+  toDate: string;
+  type: '' | 'income' | 'expense';
+};
+
+const defaultTransactionFilters: TransactionFilterState = {
+  accountId: '',
+  category: '',
+  fromDate: '',
+  tagId: '',
+  toDate: '',
+  type: '',
+};
+
+function getTransactionCategories(type: CreateTransactionInput['type']) {
+  return initialCategoryDefinitions.filter(
+    (definition) => definition.flow === 'both' || definition.flow === type,
+  );
+}
+
 export function TransactionsPage() {
   const [editingTransaction, setEditingTransaction] = useState<TransactionListItem | null>(null);
+  const [filters, setFilters] = useState<TransactionFilterState>(defaultTransactionFilters);
   const accountsSnapshotQuery = useAccountsSnapshotQuery();
+  const tagsSnapshotQuery = useTagsSnapshotQuery();
   const transactionsSnapshotQuery = useTransactionsSnapshotQuery();
   const createTransactionMutation = useCreateTransactionMutation();
   const updateTransactionMutation = useUpdateTransactionMutation();
@@ -34,6 +68,7 @@ export function TransactionsPage() {
     register,
     reset,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<CreateTransactionInput>({
     resolver: zodResolver(createTransactionInputSchema),
@@ -41,8 +76,49 @@ export function TransactionsPage() {
   });
 
   const availableAccounts = accountsSnapshotQuery.data?.activeAccounts ?? [];
+  const tags = tagsSnapshotQuery.data?.tags ?? [];
   const firstAvailableAccountId = availableAccounts[0]?.id ?? '';
   const transactions = transactionsSnapshotQuery.data?.transactions ?? [];
+  const watchedType = watch('type');
+  const watchedCategory = watch('category');
+  const availableCategories = getTransactionCategories(watchedType);
+  const tagNameById = new Map(tags.map((tag) => [tag.id, tag.name]));
+  const filteredTransactions = transactions.filter((transaction) => {
+    const transactionCategory =
+      transaction.category ?? DEFAULT_UNCATEGORIZED_CATEGORY;
+
+    if (filters.accountId && transaction.accountId !== filters.accountId) {
+      return false;
+    }
+
+    if (filters.type && transaction.type !== filters.type) {
+      return false;
+    }
+
+    if (filters.category && transactionCategory !== filters.category) {
+      return false;
+    }
+
+    if (filters.fromDate && transaction.transactionDate < filters.fromDate) {
+      return false;
+    }
+
+    if (filters.toDate && transaction.transactionDate > filters.toDate) {
+      return false;
+    }
+
+    if (filters.tagId && !(transaction.tagIds ?? []).includes(filters.tagId)) {
+      return false;
+    }
+
+    return true;
+  });
+  const filteredIncomeInCents = filteredTransactions
+    .filter((transaction) => transaction.type === 'income')
+    .reduce((sum, transaction) => sum + transaction.amountInCents, 0);
+  const filteredExpenseInCents = filteredTransactions
+    .filter((transaction) => transaction.type === 'expense')
+    .reduce((sum, transaction) => sum + transaction.amountInCents, 0);
   const currentMutationError =
     createTransactionMutation.error ?? updateTransactionMutation.error ?? deleteTransactionMutation.error;
 
@@ -51,6 +127,16 @@ export function TransactionsPage() {
       setValue('accountId', firstAvailableAccountId);
     }
   }, [editingTransaction, firstAvailableAccountId, setValue]);
+
+  useEffect(() => {
+    const categoryStillAvailable = getTransactionCategories(watchedType).some(
+      (definition) => definition.label === watchedCategory,
+    );
+
+    if (!categoryStillAvailable) {
+      setValue('category', DEFAULT_UNCATEGORIZED_CATEGORY);
+    }
+  }, [setValue, watchedCategory, watchedType]);
 
   const onSubmit = handleSubmit(async (values) => {
     if (editingTransaction) {
@@ -74,8 +160,9 @@ export function TransactionsPage() {
     reset({
       accountId: transaction.accountId,
       amountInCents: transaction.amountInCents,
-      category: transaction.category ?? '',
+      category: transaction.category ?? DEFAULT_UNCATEGORIZED_CATEGORY,
       description: transaction.description,
+      tagIds: transaction.tagIds ?? [],
       transactionDate: transaction.transactionDate,
       type: transaction.type,
     });
@@ -87,6 +174,19 @@ export function TransactionsPage() {
       ...transactionDefaultValues,
       accountId: firstAvailableAccountId,
     });
+  }
+
+  function handleFilterChange(event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+    const { name, value } = event.target;
+
+    setFilters((current) => ({
+      ...current,
+      [name]: value,
+    }));
+  }
+
+  function handleClearFilters() {
+    setFilters(defaultTransactionFilters);
   }
 
   return (
@@ -148,7 +248,13 @@ export function TransactionsPage() {
 
               <label>
                 <span>Categoria</span>
-                <input {...register('category')} placeholder="Ex.: trabalho" />
+                <select {...register('category')}>
+                  {availableCategories.map((category) => (
+                    <option key={category.label} value={category.label}>
+                      {category.label}
+                    </option>
+                  ))}
+                </select>
                 <small>{errors.category?.message}</small>
               </label>
 
@@ -167,6 +273,26 @@ export function TransactionsPage() {
                 <input {...register('transactionDate')} type="date" />
                 <small>{errors.transactionDate?.message}</small>
               </label>
+
+              <fieldset>
+                <legend>Tags</legend>
+                {tagsSnapshotQuery.isLoading ? (
+                  <div className="tag-checklist-empty">Carregando tags...</div>
+                ) : tags.length === 0 ? (
+                  <div className="tag-checklist-empty">
+                    Nenhuma tag cadastrada ainda na area de analytics.
+                  </div>
+                ) : (
+                  <div className="tag-checklist tag-checklist-grid">
+                    {tags.map((tag) => (
+                      <label className="tag-check-item" key={tag.id}>
+                        <input {...register('tagIds')} type="checkbox" value={tag.id} />
+                        <span>{tag.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </fieldset>
 
               {currentMutationError ? (
                 <div className="feedback feedback-error">{currentMutationError.message}</div>
@@ -187,33 +313,97 @@ export function TransactionsPage() {
         </article>
 
         <article className="dashboard-card summary-card">
-          <div className="eyebrow">Resumo atual</div>
+          <div className="eyebrow">Resumo filtrado</div>
           <strong className="summary-amount">
             {formatCurrencyInCents(
-              (transactionsSnapshotQuery.data?.totalIncomeInCents ?? 0) -
-                (transactionsSnapshotQuery.data?.totalExpenseInCents ?? 0),
+              filteredIncomeInCents - filteredExpenseInCents,
             )}
           </strong>
           <div className="stats-grid">
             <div className="stat-item">
               <span>Total de entradas</span>
-              <strong>
-                {formatCurrencyInCents(
-                  transactionsSnapshotQuery.data?.totalIncomeInCents ?? 0,
-                )}
-              </strong>
+              <strong>{formatCurrencyInCents(filteredIncomeInCents)}</strong>
             </div>
             <div className="stat-item">
               <span>Total de saidas</span>
-              <strong>
-                {formatCurrencyInCents(
-                  transactionsSnapshotQuery.data?.totalExpenseInCents ?? 0,
-                )}
-              </strong>
+              <strong>{formatCurrencyInCents(-1 * filteredExpenseInCents)}</strong>
+            </div>
+            <div className="stat-item">
+              <span>Itens exibidos</span>
+              <strong>{filteredTransactions.length}</strong>
             </div>
           </div>
         </article>
       </div>
+
+      <article className="dashboard-card form-card">
+        <div className="section-heading-row">
+          <div>
+            <div className="eyebrow">Filtros</div>
+            <h3>Recorte visual do historico</h3>
+          </div>
+          <button className="ghost-button" onClick={handleClearFilters} type="button">
+            Limpar filtros
+          </button>
+        </div>
+
+        <div className="filter-grid filter-grid-3">
+          <label>
+            <span>Conta</span>
+            <select name="accountId" onChange={handleFilterChange} value={filters.accountId}>
+              <option value="">Todas</option>
+              {availableAccounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span>Tipo</span>
+            <select name="type" onChange={handleFilterChange} value={filters.type}>
+              <option value="">Todos</option>
+              <option value="income">Entrada</option>
+              <option value="expense">Saida</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Categoria</span>
+            <select name="category" onChange={handleFilterChange} value={filters.category}>
+              <option value="">Todas</option>
+              {initialCategoryDefinitions.map((category) => (
+                <option key={category.label} value={category.label}>
+                  {category.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span>Tag</span>
+            <select name="tagId" onChange={handleFilterChange} value={filters.tagId}>
+              <option value="">Todas</option>
+              {tags.map((tag) => (
+                <option key={tag.id} value={tag.id}>
+                  {tag.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span>De</span>
+            <input name="fromDate" onChange={handleFilterChange} type="date" value={filters.fromDate} />
+          </label>
+
+          <label>
+            <span>Ate</span>
+            <input name="toDate" onChange={handleFilterChange} type="date" value={filters.toDate} />
+          </label>
+        </div>
+      </article>
 
       <article className="dashboard-card">
         <div className="section-heading-row">
@@ -225,16 +415,17 @@ export function TransactionsPage() {
 
         {transactionsSnapshotQuery.isLoading ? (
           <p>Carregando lancamentos...</p>
-        ) : transactions.length === 0 ? (
+        ) : filteredTransactions.length === 0 ? (
           <p>Nenhum lancamento manual registrado ate o momento.</p>
         ) : (
           <div className="stack-list">
-            {transactions.map((transaction) => (
+            {filteredTransactions.map((transaction) => (
               <div className="entity-card" key={transaction.id}>
                 <div>
                   <strong>{transaction.description}</strong>
                   <span>
-                    {transaction.accountName} • {transaction.category ?? 'Sem categoria'}
+                    {transaction.accountName} •{' '}
+                    {transaction.category ?? DEFAULT_UNCATEGORIZED_CATEGORY}
                   </span>
                   <small>{formatDate(transaction.transactionDate)}</small>
                 </div>
@@ -249,6 +440,17 @@ export function TransactionsPage() {
                   >
                     {formatCurrencyInCents(transaction.signedAmountInCents)}
                   </strong>
+                </div>
+                <div className="tag-badge-row">
+                  {(transaction.tagIds ?? []).length === 0 ? (
+                    <span className="tag-badge tag-badge-muted">Sem tags</span>
+                  ) : (
+                    (transaction.tagIds ?? []).map((tagId) => (
+                      <span className="tag-badge" key={tagId}>
+                        {tagNameById.get(tagId) ?? 'Tag removida'}
+                      </span>
+                    ))
+                  )}
                 </div>
                 <div className="entity-actions">
                   <button

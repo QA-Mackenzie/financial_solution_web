@@ -10,6 +10,7 @@ import { PasswordRecoveryPage } from './features/auth/PasswordRecoveryPage';
 import { PasswordResetPage } from './features/auth/PasswordResetPage';
 import { ContractsPage } from './features/contracts/ContractsPage';
 import { CreditCardsPage } from './features/creditCards/CreditCardsPage';
+import { AnalyticsPage } from './features/dashboard/AnalyticsPage';
 import { AccessPage } from './features/dashboard/AccessPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { InstallmentsPage } from './features/installments/InstallmentsPage';
@@ -128,6 +129,16 @@ export function App() {
               </ProtectedRoute>
             }
             path="/app/provisoes"
+          />
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <AnalyticsPage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+            path="/app/analytics"
           />
           <Route
             element={

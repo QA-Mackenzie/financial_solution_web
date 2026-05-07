@@ -1,15 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import type {
-  CreateCreditCardInput,
-  CreateCreditCardPurchaseInput,
-  CreditCardInvoice,
-  CreditCardInvoicePreview,
-  CreditCardListItem,
-  CreditCardPurchaseListItem,
-} from '@shf/contracts';
 import {
   createCreditCardInputSchema,
   createCreditCardPurchaseInputSchema,
+  DEFAULT_UNCATEGORIZED_CATEGORY,
+  initialCategoryDefinitions,
+  type CreateCreditCardInput,
+  type CreateCreditCardPurchaseInput,
+  type CreditCardInvoice,
+  type CreditCardInvoicePreview,
+  type CreditCardListItem,
+  type CreditCardPurchaseListItem,
 } from '@shf/contracts';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -24,6 +24,7 @@ import {
   useCreateCreditCardMutation,
   useCreateCreditCardPurchaseMutation,
   useCreditCardsSnapshotQuery,
+  useTagsSnapshotQuery,
   useUpdateCreditCardMutation,
   useUpdateCreditCardPurchaseMutation,
 } from '../finance/use-finance';
@@ -41,10 +42,15 @@ const creditCardDefaultValues: CreateCreditCardInput = {
 const purchaseDefaultValues: CreateCreditCardPurchaseInput = {
   creditCardId: '',
   description: '',
-  category: '',
+  category: DEFAULT_UNCATEGORIZED_CATEGORY,
   amountInCents: 0,
   purchaseDate: today,
+  tagIds: [],
 };
+
+const purchaseCategories = initialCategoryDefinitions.filter(
+  (definition) => definition.flow !== 'income',
+);
 
 const invoiceStatusLabel = {
   open: 'Aberta',
@@ -64,6 +70,7 @@ export function CreditCardsPage() {
     useState<CreditCardPurchaseListItem | null>(null);
   const accountsSnapshotQuery = useAccountsSnapshotQuery();
   const creditCardsSnapshotQuery = useCreditCardsSnapshotQuery();
+  const tagsSnapshotQuery = useTagsSnapshotQuery();
   const createCreditCardMutation = useCreateCreditCardMutation();
   const updateCreditCardMutation = useUpdateCreditCardMutation();
   const createCreditCardPurchaseMutation = useCreateCreditCardPurchaseMutation();
@@ -83,6 +90,7 @@ export function CreditCardsPage() {
     register: registerPurchase,
     reset: resetPurchase,
     setValue: setPurchaseValue,
+    watch: watchPurchase,
     formState: { errors: purchaseErrors },
   } = useForm<CreateCreditCardPurchaseInput>({
     resolver: zodResolver(createCreditCardPurchaseInputSchema),
@@ -94,8 +102,11 @@ export function CreditCardsPage() {
   const invoices = creditCardsSnapshotQuery.data?.invoices ?? [];
   const purchases = creditCardsSnapshotQuery.data?.purchases ?? [];
   const projectedInvoices = creditCardsSnapshotQuery.data?.projectedInvoices ?? [];
+  const tags = tagsSnapshotQuery.data?.tags ?? [];
   const firstAvailableAccountId = availableAccounts[0]?.id ?? '';
   const firstAvailableCardId = cards[0]?.id ?? '';
+  const watchedPurchaseCategory = watchPurchase('category');
+  const tagNameById = new Map(tags.map((tag) => [tag.id, tag.name]));
   const currentMutationError =
     createCreditCardMutation.error ??
     updateCreditCardMutation.error ??
@@ -113,6 +124,16 @@ export function CreditCardsPage() {
       setPurchaseValue('creditCardId', firstAvailableCardId);
     }
   }, [editingPurchase, firstAvailableCardId, setPurchaseValue]);
+
+  useEffect(() => {
+    const categoryStillAvailable = purchaseCategories.some(
+      (category) => category.label === watchedPurchaseCategory,
+    );
+
+    if (!categoryStillAvailable) {
+      setPurchaseValue('category', DEFAULT_UNCATEGORIZED_CATEGORY);
+    }
+  }, [setPurchaseValue, watchedPurchaseCategory]);
 
   const onSubmitCard = handleCardSubmit(async (values) => {
     if (editingCard) {
@@ -176,7 +197,7 @@ export function CreditCardsPage() {
     setEditingPurchase(purchase);
     resetPurchase({
       amountInCents: purchase.amountInCents,
-      category: purchase.category ?? '',
+      category: purchase.category ?? DEFAULT_UNCATEGORIZED_CATEGORY,
       creditCardId: purchase.creditCardId,
       description: purchase.description,
       purchaseDate: purchase.purchaseDate,
@@ -333,7 +354,13 @@ export function CreditCardsPage() {
 
               <label>
                 <span>Categoria</span>
-                <input {...registerPurchase('category')} placeholder="Ex.: tecnologia" />
+                <select {...registerPurchase('category')}>
+                  {purchaseCategories.map((category) => (
+                    <option key={category.label} value={category.label}>
+                      {category.label}
+                    </option>
+                  ))}
+                </select>
                 <small>{purchaseErrors.category?.message}</small>
               </label>
 
@@ -354,6 +381,26 @@ export function CreditCardsPage() {
                   <small>{purchaseErrors.purchaseDate?.message}</small>
                 </label>
               </div>
+
+              <fieldset>
+                <legend>Tags</legend>
+                {tagsSnapshotQuery.isLoading ? (
+                  <div className="tag-checklist-empty">Carregando tags...</div>
+                ) : tags.length === 0 ? (
+                  <div className="tag-checklist-empty">
+                    Nenhuma tag cadastrada ainda na area de analytics.
+                  </div>
+                ) : (
+                  <div className="tag-checklist tag-checklist-grid">
+                    {tags.map((tag) => (
+                      <label className="tag-check-item" key={tag.id}>
+                        <input {...registerPurchase('tagIds')} type="checkbox" value={tag.id} />
+                        <span>{tag.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </fieldset>
 
               <button
                 disabled={
@@ -601,9 +648,21 @@ export function CreditCardsPage() {
                         {purchase.category ??
                           (purchase.isProjected
                             ? 'Parcelamento projetado'
-                            : 'Sem categoria')}
+                            : DEFAULT_UNCATEGORIZED_CATEGORY)}
                       </strong>
                     </div>
+                  </div>
+
+                  <div className="tag-badge-row">
+                    {(purchase.tagIds ?? []).length === 0 ? (
+                      <span className="tag-badge tag-badge-muted">Sem tags</span>
+                    ) : (
+                      (purchase.tagIds ?? []).map((tagId) => (
+                        <span className="tag-badge" key={tagId}>
+                          {tagNameById.get(tagId) ?? 'Tag removida'}
+                        </span>
+                      ))
+                    )}
                   </div>
                 </div>
               ))}

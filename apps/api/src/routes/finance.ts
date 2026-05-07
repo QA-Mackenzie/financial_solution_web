@@ -7,6 +7,7 @@ import {
   createCreditCardInputSchema,
   createCreditCardPurchaseInputSchema,
   createAccountInputSchema,
+  createTagInputSchema,
   createContractAdjustmentInputSchema,
   createContractInputSchema,
   createProvisionInputSchema,
@@ -20,6 +21,9 @@ import {
   contractSchema,
   contractsSnapshotSchema,
   endContractInputSchema,
+  financialAnalyticsSnapshotSchema,
+  financialRecordFilterSchema,
+  financialRecordQuerySnapshotSchema,
   horizonSettingsSchema,
   horizonSnapshotSchema,
   installmentOperationSchema,
@@ -30,6 +34,8 @@ import {
   provisionsPlanningSnapshotSchema,
   redeemProvisionInputSchema,
   removeVariableExpenseOverrideInputSchema,
+  tagListItemSchema,
+  tagsSnapshotSchema,
   transactionsSnapshotSchema,
   updateInstallmentAnticipationInputSchema,
   updateInstallmentPlanInputSchema,
@@ -39,6 +45,7 @@ import {
   updateContractInputSchema,
   updateHorizonSettingsInputSchema,
   updateAccountInputSchema,
+  updateTagInputSchema,
   updateTransactionInputSchema,
   variableExpenseOverrideListItemSchema,
   variableExpenseOverrideSchema,
@@ -72,6 +79,14 @@ const transactionsSnapshotResponseSchema = z.object({
   snapshot: transactionsSnapshotSchema,
 });
 
+const financialRecordQueryResponseSchema = z.object({
+  snapshot: financialRecordQuerySnapshotSchema,
+});
+
+const financialAnalyticsResponseSchema = z.object({
+  snapshot: financialAnalyticsSnapshotSchema,
+});
+
 const contractsSnapshotResponseSchema = z.object({
   snapshot: contractsSnapshotSchema,
 });
@@ -92,6 +107,10 @@ const variableExpenseSnapshotResponseSchema = z.object({
   snapshot: variableExpenseSnapshotSchema,
 });
 
+const tagsSnapshotResponseSchema = z.object({
+  snapshot: tagsSnapshotSchema,
+});
+
 const creditCardResponseSchema = z.object({
   creditCard: creditCardListItemSchema,
 });
@@ -110,6 +129,10 @@ const provisionResponseSchema = z.object({
 
 const variableExpenseOverrideResponseSchema = z.object({
   override: variableExpenseOverrideListItemSchema,
+});
+
+const tagResponseSchema = z.object({
+  tag: tagListItemSchema,
 });
 
 const creditCardPurchaseResponseSchema = z.object({
@@ -228,6 +251,63 @@ export function financeRoutes(financeService: FinanceService): FastifyPluginAsyn
       return reply.send(
         variableExpenseSnapshotResponseSchema.parse({ snapshot }),
       );
+    });
+
+    app.get('/api/v1/tags', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const snapshot = await financeService.getTagsSnapshot(
+        authorizedSession.userId,
+      );
+
+      return reply.send(tagsSnapshotResponseSchema.parse({ snapshot }));
+    });
+
+    app.get('/api/v1/records', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const parsedQuery = financialRecordFilterSchema.safeParse(request.query);
+
+      if (!parsedQuery.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedQuery.error.flatten(),
+        );
+      }
+
+      const snapshot = await financeService.listFinancialRecords(
+        authorizedSession.userId,
+        parsedQuery.data,
+      );
+
+      return reply.send(financialRecordQueryResponseSchema.parse({ snapshot }));
+    });
+
+    app.get('/api/v1/analytics', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const parsedQuery = financialRecordFilterSchema.safeParse(request.query);
+
+      if (!parsedQuery.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedQuery.error.flatten(),
+        );
+      }
+
+      const snapshot = await financeService.getFinancialAnalytics(
+        authorizedSession.userId,
+        parsedQuery.data,
+      );
+
+      return reply.send(financialAnalyticsResponseSchema.parse({ snapshot }));
     });
 
     app.post('/api/v1/accounts', async (request, reply) => {
@@ -376,6 +456,30 @@ export function financeRoutes(financeService: FinanceService): FastifyPluginAsyn
       );
 
       return reply.code(201).send(provisionResponseSchema.parse({ provision }));
+    });
+
+    app.post('/api/v1/tags', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const parsedBody = createTagInputSchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedBody.error.flatten(),
+        );
+      }
+
+      const tag = await financeService.createTag(
+        authorizedSession.userId,
+        parsedBody.data,
+        getRequestContext(request),
+      );
+
+      return reply.code(201).send(tagResponseSchema.parse({ tag }));
     });
 
     app.post('/api/v1/installment-operations', async (request, reply) => {
@@ -592,6 +696,44 @@ export function financeRoutes(financeService: FinanceService): FastifyPluginAsyn
       );
 
       return reply.send(provisionResponseSchema.parse({ provision }));
+    });
+
+    app.put('/api/v1/tags/:id', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const parsedParams = idParamSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedParams.error.flatten(),
+        );
+      }
+
+      const parsedBody = createTagInputSchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedBody.error.flatten(),
+        );
+      }
+
+      const tag = await financeService.updateTag(
+        authorizedSession.userId,
+        updateTagInputSchema.parse({
+          ...parsedBody.data,
+          id: parsedParams.data.id,
+        }),
+        getRequestContext(request),
+      );
+
+      return reply.send(tagResponseSchema.parse({ tag }));
     });
 
     app.post('/api/v1/provisions/:id/redeem', async (request, reply) => {
@@ -933,6 +1075,30 @@ export function financeRoutes(financeService: FinanceService): FastifyPluginAsyn
       );
 
       return reply.code(204).send();
+    });
+
+    app.delete('/api/v1/tags/:id', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const parsedParams = idParamSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedParams.error.flatten(),
+        );
+      }
+
+      const tag = await financeService.deleteTag(
+        authorizedSession.userId,
+        parsedParams.data.id,
+        getRequestContext(request),
+      );
+
+      return reply.send(tagResponseSchema.parse({ tag }));
     });
 
     app.delete('/api/v1/variable-expense-overrides', async (request, reply) => {
