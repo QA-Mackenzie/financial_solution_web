@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  AnticipateInstallmentPlanInput,
   CreateAccountInput,
   CreateCreditCardInput,
   CreateCreditCardPurchaseInput,
   CreateContractAdjustmentInput,
   CreateContractInput,
+  CreateInstallmentPlanInput,
   CreateTransactionInput,
   EndContractInput,
   UpdateHorizonSettingsInput,
@@ -12,6 +14,7 @@ import type {
   UpdateAccountInput,
   UpdateCreditCardInput,
   UpdateCreditCardPurchaseInput,
+  UpdateInstallmentPlanInput,
   UpdateTransactionInput,
 } from '@shf/contracts';
 
@@ -21,6 +24,7 @@ export const accountsSnapshotQueryKey = ['finance', 'accounts', 'snapshot'];
 export const creditCardsSnapshotQueryKey = ['finance', 'credit-cards', 'snapshot'];
 export const contractsSnapshotQueryKey = ['finance', 'contracts', 'snapshot'];
 export const horizonSnapshotQueryKey = ['finance', 'horizon', 'snapshot'];
+export const installmentsSnapshotQueryKey = ['finance', 'installments', 'snapshot'];
 export const transactionsSnapshotQueryKey = ['finance', 'transactions', 'snapshot'];
 
 async function invalidateFinancialQueries(queryClient: ReturnType<typeof useQueryClient>) {
@@ -29,6 +33,7 @@ async function invalidateFinancialQueries(queryClient: ReturnType<typeof useQuer
     queryClient.invalidateQueries({ queryKey: creditCardsSnapshotQueryKey }),
     queryClient.invalidateQueries({ queryKey: contractsSnapshotQueryKey }),
     queryClient.invalidateQueries({ queryKey: horizonSnapshotQueryKey }),
+    queryClient.invalidateQueries({ queryKey: installmentsSnapshotQueryKey }),
     queryClient.invalidateQueries({ queryKey: transactionsSnapshotQueryKey }),
   ]);
 }
@@ -58,6 +63,13 @@ export function useCreditCardsSnapshotQuery() {
   return useQuery({
     queryFn: financeApi.getCreditCardsSnapshot,
     queryKey: creditCardsSnapshotQueryKey,
+  });
+}
+
+export function useInstallmentsSnapshotQuery() {
+  return useQuery({
+    queryFn: financeApi.getInstallmentsSnapshot,
+    queryKey: installmentsSnapshotQueryKey,
   });
 }
 
@@ -203,6 +215,36 @@ export function useUpdateHorizonSettingsMutation() {
   return useMutation({
     mutationFn: (input: UpdateHorizonSettingsInput) =>
       financeApi.updateHorizonSettings(input),
+    onSuccess: async () => invalidateFinancialQueries(queryClient),
+  });
+}
+
+export function useCreateInstallmentPlanMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: CreateInstallmentPlanInput) =>
+      financeApi.createInstallmentPlan(input),
+    onSuccess: async () => invalidateFinancialQueries(queryClient),
+  });
+}
+
+export function useUpdateInstallmentPlanMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: UpdateInstallmentPlanInput) =>
+      financeApi.updateInstallmentPlan(input),
+    onSuccess: async () => invalidateFinancialQueries(queryClient),
+  });
+}
+
+export function useAnticipateInstallmentPlanMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: AnticipateInstallmentPlanInput) =>
+      financeApi.anticipateInstallmentPlan(input),
     onSuccess: async () => invalidateFinancialQueries(queryClient),
   });
 }

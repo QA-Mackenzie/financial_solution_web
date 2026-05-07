@@ -95,6 +95,7 @@ describe('installment anticipation validation', () => {
       validateInstallmentAnticipationInput({
         planId: ' ',
         operationDate: '26/04/2026',
+        affectedInstallmentCount: 0,
       }),
     ).toEqual([
       {
@@ -106,6 +107,10 @@ describe('installment anticipation validation', () => {
         message:
           'Informe uma data valida para a antecipacao no formato AAAA-MM-DD.',
       },
+      {
+        field: 'affectedInstallmentCount',
+        message: 'A quantidade de parcelas antecipadas deve ficar entre 1 e 60.',
+      },
     ]);
   });
 
@@ -114,10 +119,12 @@ describe('installment anticipation validation', () => {
       sanitizeInstallmentAnticipationInput({
         planId: ' plan-1 ',
         operationDate: ' 2026-05-10 ',
+        affectedInstallmentCount: 2,
       }),
     ).toEqual({
       planId: 'plan-1',
       operationDate: '2026-05-10',
+      affectedInstallmentCount: 2,
     });
   });
 });

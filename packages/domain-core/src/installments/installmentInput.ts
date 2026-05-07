@@ -27,7 +27,7 @@ export interface InstallmentValidationIssue {
 }
 
 export interface InstallmentAnticipationValidationIssue {
-  field: 'planId' | 'operationDate';
+  field: 'planId' | 'operationDate' | 'affectedInstallmentCount';
   message: string;
 }
 
@@ -169,6 +169,7 @@ export const sanitizeInstallmentPlanInput = <
 export const validateInstallmentAnticipationInput = (input: {
   planId: string;
   operationDate: string;
+  affectedInstallmentCount: number;
 }): InstallmentAnticipationValidationIssue[] => {
   const issues: InstallmentAnticipationValidationIssue[] = [];
 
@@ -184,6 +185,17 @@ export const validateInstallmentAnticipationInput = (input: {
       field: 'operationDate',
       message:
         'Informe uma data valida para a antecipacao no formato AAAA-MM-DD.',
+    });
+  }
+
+  if (
+    !Number.isInteger(input.affectedInstallmentCount) ||
+    input.affectedInstallmentCount < 1 ||
+    input.affectedInstallmentCount > 60
+  ) {
+    issues.push({
+      field: 'affectedInstallmentCount',
+      message: 'A quantidade de parcelas antecipadas deve ficar entre 1 e 60.',
     });
   }
 

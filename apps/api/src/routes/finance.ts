@@ -1,7 +1,9 @@
 import type { FastifyPluginAsync } from 'fastify';
 
 import {
+  anticipateInstallmentPlanInputSchema,
   archiveAccountInputSchema,
+  createInstallmentPlanInputSchema,
   createCreditCardInputSchema,
   createCreditCardPurchaseInputSchema,
   createAccountInputSchema,
@@ -19,8 +21,13 @@ import {
   endContractInputSchema,
   horizonSettingsSchema,
   horizonSnapshotSchema,
+  installmentOperationSchema,
+  installmentPlanListItemSchema,
+  installmentsSnapshotSchema,
   manualTransactionSchema,
   transactionsSnapshotSchema,
+  updateInstallmentAnticipationInputSchema,
+  updateInstallmentPlanInputSchema,
   updateCreditCardInputSchema,
   updateCreditCardPurchaseInputSchema,
   updateContractInputSchema,
@@ -64,8 +71,20 @@ const creditCardsSnapshotResponseSchema = z.object({
   snapshot: creditCardsSnapshotSchema,
 });
 
+const installmentsSnapshotResponseSchema = z.object({
+  snapshot: installmentsSnapshotSchema,
+});
+
 const creditCardResponseSchema = z.object({
   creditCard: creditCardListItemSchema,
+});
+
+const installmentPlanResponseSchema = z.object({
+  plan: installmentPlanListItemSchema,
+});
+
+const installmentOperationResponseSchema = z.object({
+  operation: installmentOperationSchema,
 });
 
 const creditCardPurchaseResponseSchema = z.object({
@@ -145,6 +164,17 @@ export function financeRoutes(financeService: FinanceService): FastifyPluginAsyn
       );
 
       return reply.send(creditCardsSnapshotResponseSchema.parse({ snapshot }));
+    });
+
+    app.get('/api/v1/installments', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const snapshot = await financeService.getInstallmentsSnapshot(
+        authorizedSession.userId,
+      );
+
+      return reply.send(installmentsSnapshotResponseSchema.parse({ snapshot }));
     });
 
     app.post('/api/v1/accounts', async (request, reply) => {
@@ -244,6 +274,56 @@ export function financeRoutes(financeService: FinanceService): FastifyPluginAsyn
 
       return reply.code(201).send(
         creditCardPurchaseResponseSchema.parse({ purchase }),
+      );
+    });
+
+    app.post('/api/v1/installments', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const parsedBody = createInstallmentPlanInputSchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedBody.error.flatten(),
+        );
+      }
+
+      const plan = await financeService.createInstallmentPlan(
+        authorizedSession.userId,
+        parsedBody.data,
+        getRequestContext(request),
+      );
+
+      return reply.code(201).send(installmentPlanResponseSchema.parse({ plan }));
+    });
+
+    app.post('/api/v1/installment-operations', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const parsedBody = anticipateInstallmentPlanInputSchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedBody.error.flatten(),
+        );
+      }
+
+      const operation = await financeService.anticipateInstallmentPlan(
+        authorizedSession.userId,
+        parsedBody.data,
+        getRequestContext(request),
+      );
+
+      return reply.code(201).send(
+        installmentOperationResponseSchema.parse({ operation }),
       );
     });
 
@@ -359,6 +439,44 @@ export function financeRoutes(financeService: FinanceService): FastifyPluginAsyn
       );
 
       return reply.send(creditCardResponseSchema.parse({ creditCard }));
+    });
+
+    app.put('/api/v1/installments/:id', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const parsedParams = idParamSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedParams.error.flatten(),
+        );
+      }
+
+      const parsedBody = createInstallmentPlanInputSchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedBody.error.flatten(),
+        );
+      }
+
+      const plan = await financeService.updateInstallmentPlan(
+        authorizedSession.userId,
+        updateInstallmentPlanInputSchema.parse({
+          ...parsedBody.data,
+          id: parsedParams.data.id,
+        }),
+        getRequestContext(request),
+      );
+
+      return reply.send(installmentPlanResponseSchema.parse({ plan }));
     });
 
     app.post('/api/v1/accounts/:id/archive', async (request, reply) => {
@@ -499,6 +617,46 @@ export function financeRoutes(financeService: FinanceService): FastifyPluginAsyn
       );
 
       return reply.send(creditCardPurchaseResponseSchema.parse({ purchase }));
+    });
+
+    app.put('/api/v1/installment-operations/:id', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const parsedParams = idParamSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedParams.error.flatten(),
+        );
+      }
+
+      const parsedBody = anticipateInstallmentPlanInputSchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedBody.error.flatten(),
+        );
+      }
+
+      const operation = await financeService.updateInstallmentAnticipation(
+        authorizedSession.userId,
+        updateInstallmentAnticipationInputSchema.parse({
+          ...parsedBody.data,
+          id: parsedParams.data.id,
+        }),
+        getRequestContext(request),
+      );
+
+      return reply.send(
+        installmentOperationResponseSchema.parse({ operation }),
+      );
     });
 
     app.get('/api/v1/transactions', async (request, reply) => {

@@ -77,7 +77,7 @@ describe('buildInstallmentOccurrenceListItems', () => {
     ]);
   });
 
-  it('moves only future installments when an anticipation is registered', () => {
+  it('anticipates only the configured number of future installments', () => {
     const operations: InstallmentOperation[] = [
       {
         id: 'operation-1',
@@ -85,13 +85,19 @@ describe('buildInstallmentOccurrenceListItems', () => {
         type: 'anticipation',
         operationDate: '2026-05-10',
         affectedInstallmentCount: 2,
-        affectedAmountInCents: 6666,
+        affectedAmountInCents: 6000,
         createdAt: '2026-05-10T12:00:00.000Z',
       },
     ];
 
     const occurrences = buildInstallmentOccurrenceListItems(
-      [basePlan],
+      [
+        {
+          ...basePlan,
+          totalAmountInCents: 12000,
+          installmentCount: 4,
+        },
+      ],
       operations,
     );
 
@@ -113,6 +119,69 @@ describe('buildInstallmentOccurrenceListItems', () => {
         originalOccurrenceDate: '2026-06-24',
         occurrenceDate: '2026-05-10',
         anticipatedOperationId: 'operation-1',
+      }),
+      expect.objectContaining({
+        id: 'plan-1:4',
+        originalOccurrenceDate: '2026-07-24',
+        occurrenceDate: '2026-07-24',
+        anticipatedOperationId: null,
+      }),
+    ]);
+  });
+
+  it('applies multiple anticipation operations in chronological order', () => {
+    const operations: InstallmentOperation[] = [
+      {
+        id: 'operation-1',
+        planId: 'plan-1',
+        type: 'anticipation',
+        operationDate: '2026-05-10',
+        affectedInstallmentCount: 1,
+        affectedAmountInCents: 2500,
+        createdAt: '2026-05-10T12:00:00.000Z',
+      },
+      {
+        id: 'operation-2',
+        planId: 'plan-1',
+        type: 'anticipation',
+        operationDate: '2026-06-05',
+        affectedInstallmentCount: 2,
+        affectedAmountInCents: 5000,
+        createdAt: '2026-06-05T12:00:00.000Z',
+      },
+    ];
+
+    const occurrences = buildInstallmentOccurrenceListItems(
+      [
+        {
+          ...basePlan,
+          totalAmountInCents: 10000,
+          installmentCount: 4,
+        },
+      ],
+      operations,
+    );
+
+    expect(occurrences).toEqual([
+      expect.objectContaining({
+        id: 'plan-1:1',
+        occurrenceDate: '2026-04-24',
+        anticipatedOperationId: null,
+      }),
+      expect.objectContaining({
+        id: 'plan-1:2',
+        occurrenceDate: '2026-05-10',
+        anticipatedOperationId: 'operation-1',
+      }),
+      expect.objectContaining({
+        id: 'plan-1:3',
+        occurrenceDate: '2026-06-05',
+        anticipatedOperationId: 'operation-2',
+      }),
+      expect.objectContaining({
+        id: 'plan-1:4',
+        occurrenceDate: '2026-06-05',
+        anticipatedOperationId: 'operation-2',
       }),
     ]);
   });

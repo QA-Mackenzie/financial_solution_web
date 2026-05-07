@@ -1,6 +1,7 @@
 import type {
   Account,
   AccountsSnapshot,
+  AnticipateInstallmentPlanInput,
   CreditCardListItem,
   CreditCardPurchaseListItem,
   CreditCardsSnapshot,
@@ -12,9 +13,13 @@ import type {
   CreateCreditCardPurchaseInput,
   CreateContractAdjustmentInput,
   CreateContractInput,
+  CreateInstallmentPlanInput,
   CreateTransactionInput,
   EndContractInput,
   HorizonSnapshot,
+  InstallmentOperation,
+  InstallmentPlanListItem,
+  InstallmentsSnapshot,
   LoginInput,
   ManualTransaction,
   PasswordResetInput,
@@ -28,6 +33,7 @@ import type {
   UpdateCreditCardPurchaseInput,
   UpdateContractInput,
   UpdateHorizonSettingsInput,
+  UpdateInstallmentPlanInput,
   UpdateTransactionInput,
 } from '@shf/contracts';
 
@@ -168,6 +174,13 @@ export const financeApi = {
 
     return payload.snapshot;
   },
+  async getInstallmentsSnapshot(): Promise<InstallmentsSnapshot> {
+    const payload = await request<{ snapshot: InstallmentsSnapshot }>(
+      '/api/v1/installments',
+    );
+
+    return payload.snapshot;
+  },
   async updateHorizonSettings(
     input: UpdateHorizonSettingsInput,
   ): Promise<UpdateHorizonSettingsInput> {
@@ -200,6 +213,19 @@ export const financeApi = {
 
     return payload.creditCard;
   },
+  async createInstallmentPlan(
+    input: CreateInstallmentPlanInput,
+  ): Promise<InstallmentPlanListItem> {
+    const payload = await request<{ plan: InstallmentPlanListItem }>(
+      '/api/v1/installments',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+    );
+
+    return payload.plan;
+  },
   async updateCreditCard(input: UpdateCreditCardInput): Promise<CreditCardListItem> {
     const payload = await request<{ creditCard: CreditCardListItem }>(
       `/api/v1/credit-cards/${input.id}`,
@@ -217,6 +243,27 @@ export const financeApi = {
 
     return payload.creditCard;
   },
+  async updateInstallmentPlan(
+    input: UpdateInstallmentPlanInput,
+  ): Promise<InstallmentPlanListItem> {
+    const payload = await request<{ plan: InstallmentPlanListItem }>(
+      `/api/v1/installments/${input.id}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          accountId: input.accountId,
+          creditCardId: input.creditCardId,
+          description: input.description,
+          firstOccurrenceDate: input.firstOccurrenceDate,
+          installmentCount: input.installmentCount,
+          sourceType: input.sourceType,
+          totalAmountInCents: input.totalAmountInCents,
+        }),
+      },
+    );
+
+    return payload.plan;
+  },
   async createCreditCardPurchase(
     input: CreateCreditCardPurchaseInput,
   ): Promise<CreditCardPurchaseListItem> {
@@ -229,6 +276,19 @@ export const financeApi = {
     );
 
     return payload.purchase;
+  },
+  async anticipateInstallmentPlan(
+    input: AnticipateInstallmentPlanInput,
+  ): Promise<InstallmentOperation> {
+    const payload = await request<{ operation: InstallmentOperation }>(
+      '/api/v1/installment-operations',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+    );
+
+    return payload.operation;
   },
   async updateCreditCardPurchase(
     input: UpdateCreditCardPurchaseInput,

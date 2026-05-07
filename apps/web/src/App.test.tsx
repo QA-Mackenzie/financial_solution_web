@@ -5,16 +5,22 @@ import type {
   CreditCardPurchase,
   ContractsSnapshot,
   HorizonSnapshot,
+  InstallmentOperation,
+  InstallmentPlanListItem,
   SessionPayload,
   TransactionsSnapshot,
 } from '@shf/contracts';
 import {
+  buildCombinedCreditCardFinancials,
   buildCreditCardInvoices,
   buildCreditCardPurchaseListItems,
   buildCurrentCreditCardCycle,
   buildCurrentCreditCardInvoicePreview,
   buildFinancialHorizon,
+  buildInstallmentOccurrenceListItems,
   buildProjectedCreditCardInvoiceOccurrences,
+  buildProjectedInstallmentCreditCardPurchases,
+  buildProjectedInstallmentOccurrences,
 } from '@shf/domain-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -916,6 +922,411 @@ function mockCreditCardShellFlow() {
   });
 }
 
+function mockInstallmentShellFlow() {
+  const session: SessionPayload = {
+    user: {
+      id: '92f49d09-7671-4518-bd08-c566ce68636a',
+      name: 'Alexandre Demo',
+      email: 'alexandre@example.com',
+      emailVerifiedAt: null,
+    },
+    expiresAt: '2026-01-08T12:00:00.000Z',
+    issuedAt: '2026-01-01T12:00:00.000Z',
+  };
+  const referenceDate = '2026-05-06';
+  const state = {
+    accounts: [] as Array<{
+      id: string;
+      name: string;
+      type: 'checking' | 'savings' | 'cash' | 'investment' | 'other';
+      openingBalanceInCents: number;
+      isArchived: boolean;
+      archivedAt: string | null;
+      createdAt: string;
+      updatedAt: string;
+    }>,
+    creditCards: [] as CreditCard[],
+    installmentOperations: [] as InstallmentOperation[],
+    installmentPlans: [] as InstallmentPlanListItem[],
+    purchases: [] as CreditCardPurchase[],
+    settings: {
+      safetyMarginInCents: 50000,
+      variableExpenseWindowInMonths: 3,
+    },
+  };
+  const emptyContractsSnapshot: ContractsSnapshot = {
+    activeContracts: [],
+    inactiveContracts: [],
+    totalActiveIncomeInCents: 0,
+    totalActiveExpenseInCents: 0,
+    netActiveAmountInCents: 0,
+  };
+
+  function buildAccountsSnapshot(): AccountsSnapshot {
+    const activeAccounts = state.accounts
+      .filter((account) => !account.isArchived)
+      .map((account) => ({
+        ...account,
+        currentBalanceInCents: account.openingBalanceInCents,
+      }));
+
+    return {
+      activeAccounts,
+      archivedAccounts: [],
+      consolidatedBalanceInCents: activeAccounts.reduce(
+        (sum, account) => sum + account.currentBalanceInCents,
+        0,
+      ),
+    };
+  }
+
+  function buildInstallmentsSnapshot() {
+    const plans = state.installmentPlans.slice();
+    const operations = state.installmentOperations.slice();
+    const occurrences = buildInstallmentOccurrenceListItems(plans, operations);
+    const projectedAccountOccurrences = buildProjectedInstallmentOccurrences(
+      occurrences,
+      referenceDate,
+    );
+    const projectedCreditCardPurchases =
+      buildProjectedInstallmentCreditCardPurchases(occurrences, referenceDate);
+
+    return {
+      plans,
+      occurrences,
+      operations,
+      projectedAccountOccurrences,
+      projectedCreditCardPurchases,
+      totalRemainingAmountInCents:
+        projectedAccountOccurrences.reduce(
+          (sum, occurrence) => sum + occurrence.amountInCents,
+          0,
+        ) +
+        projectedCreditCardPurchases.reduce(
+          (sum, purchase) => sum + purchase.amountInCents,
+          0,
+        ),
+    };
+  }
+
+  function buildCreditCardsSnapshot() {
+    const billingCards = state.creditCards.map((card) => {
+      const paymentAccountName =
+        state.accounts.find((account) => account.id === card.paymentAccountId)?.name ?? '';
+
+      return {
+        dueDay: card.dueDay,
+        id: card.id,
+        name: card.name,
+        paymentAccountId: card.paymentAccountId,
+        paymentAccountName,
+        statementClosingDay: card.statementClosingDay,
+      };
+    });
+    const persistedPurchases = buildCreditCardPurchaseListItems(
+      billingCards,
+      state.purchases,
+    );
+    const persistedInvoices = buildCreditCardInvoices(persistedPurchases, referenceDate);
+    const cards = state.creditCards.map((card) => {
+      const paymentAccountName =
+        state.accounts.find((account) => account.id === card.paymentAccountId)?.name ?? '';
+      const currentCycle = buildCurrentCreditCardCycle(card, referenceDate);
+      const currentInvoicePreview = buildCurrentCreditCardInvoicePreview(
+        {
+          dueDay: card.dueDay,
+          id: card.id,
+          name: card.name,
+          statementClosingDay: card.statementClosingDay,
+        },
+        referenceDate,
+      );
+      const matchingInvoice = persistedInvoices.find(
+        (invoice) => invoice.id === `${card.id}:${currentCycle.invoiceMonth}`,
+      );
+
+      return {
+        ...card,
+        currentCycle,
+        currentInvoice: {
+          ...currentInvoicePreview,
+          totalAmountInCents: matchingInvoice?.totalAmountInCents ?? 0,
+        },
+        paymentAccountName,
+      };
+    });
+    const combined = buildCombinedCreditCardFinancials(
+      cards,
+      persistedPurchases,
+      buildInstallmentsSnapshot(),
+      referenceDate,
+    );
+
+    return {
+      ...combined,
+      totalCreditLimitInCents: cards.reduce(
+        (sum, card) => sum + card.creditLimitInCents,
+        0,
+      ),
+    };
+  }
+
+  function buildHorizonSnapshot(): HorizonSnapshot {
+    const accountsSnapshot = buildAccountsSnapshot();
+    const installmentsSnapshot = buildInstallmentsSnapshot();
+    const creditCardsSnapshot = buildCreditCardsSnapshot();
+
+    return {
+      generatedAt: '2026-05-06T13:00:00.000Z',
+      settings: state.settings,
+      horizon: buildFinancialHorizon(
+        accountsSnapshot,
+        {
+          totalExpenseInCents: 0,
+          totalIncomeInCents: 0,
+          transactions: [],
+        },
+        {
+          currentDate: referenceDate,
+          projectedCreditCardInvoiceOccurrences:
+            creditCardsSnapshot.projectedInvoices,
+          projectedInstallmentOccurrences:
+            installmentsSnapshot.projectedAccountOccurrences,
+          safetyMarginInCents: state.settings.safetyMarginInCents,
+          totalMonths: 24,
+        },
+      ),
+    };
+  }
+
+  return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    const urlValue = input instanceof Request ? input.url : String(input);
+    const pathname = new URL(urlValue).pathname;
+    const method = (init?.method ?? 'GET').toUpperCase();
+
+    if (pathname === '/api/v1/session') {
+      return mockJsonResponse({ session });
+    }
+
+    if (pathname === '/api/v1/accounts' && method === 'GET') {
+      return mockJsonResponse({ snapshot: buildAccountsSnapshot() });
+    }
+
+    if (pathname === '/api/v1/accounts' && method === 'POST') {
+      const payload = JSON.parse(String(init?.body)) as {
+        name: string;
+        openingBalanceInCents: number;
+        type: 'checking' | 'savings' | 'cash' | 'investment' | 'other';
+      };
+      const account = {
+        id: '11111111-1111-4111-8111-111111111111',
+        name: payload.name,
+        type: payload.type,
+        openingBalanceInCents: payload.openingBalanceInCents,
+        isArchived: false,
+        archivedAt: null,
+        createdAt: '2026-05-06T12:00:00.000Z',
+        updatedAt: '2026-05-06T12:00:00.000Z',
+      };
+
+      state.accounts = [account];
+
+      return mockJsonResponse({ account });
+    }
+
+    if (pathname === '/api/v1/credit-cards' && method === 'GET') {
+      return mockJsonResponse({ snapshot: buildCreditCardsSnapshot() });
+    }
+
+    if (pathname === '/api/v1/credit-cards' && method === 'POST') {
+      const payload = JSON.parse(String(init?.body)) as {
+        name: string;
+        creditLimitInCents: number;
+        statementClosingDay: number;
+        dueDay: number;
+        paymentAccountId: string;
+      };
+      const creditCard: CreditCard = {
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        name: payload.name,
+        creditLimitInCents: payload.creditLimitInCents,
+        statementClosingDay: payload.statementClosingDay,
+        dueDay: payload.dueDay,
+        paymentAccountId: payload.paymentAccountId,
+        createdAt: '2026-05-06T12:10:00.000Z',
+        updatedAt: '2026-05-06T12:10:00.000Z',
+      };
+
+      state.creditCards = [...state.creditCards, creditCard];
+
+      return mockJsonResponse({
+        creditCard: buildCreditCardsSnapshot().cards.find((card) => card.id === creditCard.id),
+      });
+    }
+
+    if (pathname === '/api/v1/installments' && method === 'GET') {
+      return mockJsonResponse({ snapshot: buildInstallmentsSnapshot() });
+    }
+
+    if (pathname === '/api/v1/installments' && method === 'POST') {
+      const payload = JSON.parse(String(init?.body)) as {
+        sourceType: 'account' | 'creditCard';
+        accountId?: string;
+        creditCardId?: string;
+        description: string;
+        totalAmountInCents: number;
+        installmentCount: number;
+        firstOccurrenceDate: string;
+      };
+      const planId =
+        state.installmentPlans.length === 0
+          ? 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+          : 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+      const linkedAccount = payload.accountId
+        ? state.accounts.find((account) => account.id === payload.accountId)
+        : undefined;
+      const linkedCard = payload.creditCardId
+        ? state.creditCards.find((card) => card.id === payload.creditCardId)
+        : undefined;
+      const paymentAccount = linkedCard
+        ? state.accounts.find((account) => account.id === linkedCard.paymentAccountId)
+        : undefined;
+      const plan: InstallmentPlanListItem = {
+        id: planId,
+        sourceType: payload.sourceType,
+        accountId: payload.sourceType === 'account' ? payload.accountId ?? null : null,
+        creditCardId:
+          payload.sourceType === 'creditCard' ? payload.creditCardId ?? null : null,
+        description: payload.description,
+        totalAmountInCents: payload.totalAmountInCents,
+        installmentCount: payload.installmentCount,
+        firstOccurrenceDate: payload.firstOccurrenceDate,
+        accountName: linkedAccount?.name ?? null,
+        creditCardName: linkedCard?.name ?? null,
+        paymentAccountId: linkedCard?.paymentAccountId ?? null,
+        paymentAccountName: paymentAccount?.name ?? null,
+        createdAt:
+          state.installmentPlans.length === 0
+            ? '2026-05-06T12:20:00.000Z'
+            : '2026-05-06T12:40:00.000Z',
+        updatedAt:
+          state.installmentPlans.length === 0
+            ? '2026-05-06T12:20:00.000Z'
+            : '2026-05-06T12:40:00.000Z',
+      };
+
+      state.installmentPlans = [...state.installmentPlans, plan];
+
+      return mockJsonResponse({ plan });
+    }
+
+    const updateInstallmentMatch = pathname.match(/^\/api\/v1\/installments\/([^/]+)$/);
+
+    if (updateInstallmentMatch && method === 'PUT') {
+      const planId = updateInstallmentMatch[1] ?? '';
+      const payload = JSON.parse(String(init?.body)) as {
+        sourceType: 'account' | 'creditCard';
+        accountId?: string;
+        creditCardId?: string;
+        description: string;
+        totalAmountInCents: number;
+        installmentCount: number;
+        firstOccurrenceDate: string;
+      };
+      const linkedAccount = payload.accountId
+        ? state.accounts.find((account) => account.id === payload.accountId)
+        : undefined;
+      const linkedCard = payload.creditCardId
+        ? state.creditCards.find((card) => card.id === payload.creditCardId)
+        : undefined;
+      const paymentAccount = linkedCard
+        ? state.accounts.find((account) => account.id === linkedCard.paymentAccountId)
+        : undefined;
+
+      state.installmentPlans = state.installmentPlans.map((plan) =>
+        plan.id === planId
+          ? {
+              ...plan,
+              sourceType: payload.sourceType,
+              accountId:
+                payload.sourceType === 'account' ? payload.accountId ?? null : null,
+              creditCardId:
+                payload.sourceType === 'creditCard'
+                  ? payload.creditCardId ?? null
+                  : null,
+              description: payload.description,
+              totalAmountInCents: payload.totalAmountInCents,
+              installmentCount: payload.installmentCount,
+              firstOccurrenceDate: payload.firstOccurrenceDate,
+              accountName: linkedAccount?.name ?? null,
+              creditCardName: linkedCard?.name ?? null,
+              paymentAccountId: linkedCard?.paymentAccountId ?? null,
+              paymentAccountName: paymentAccount?.name ?? null,
+              updatedAt: '2026-05-06T12:30:00.000Z',
+            }
+          : plan,
+      );
+
+      return mockJsonResponse({
+        plan: state.installmentPlans.find((plan) => plan.id === planId),
+      });
+    }
+
+    if (pathname === '/api/v1/installment-operations' && method === 'POST') {
+      const payload = JSON.parse(String(init?.body)) as {
+        planId: string;
+        operationDate: string;
+        affectedInstallmentCount: number;
+      };
+      const eligibleOccurrences = buildInstallmentOccurrenceListItems(
+        state.installmentPlans,
+        state.installmentOperations,
+      )
+        .filter(
+          (occurrence) =>
+            occurrence.planId === payload.planId &&
+            occurrence.occurrenceDate > payload.operationDate,
+        )
+        .sort(
+          (left, right) =>
+            left.occurrenceDate.localeCompare(right.occurrenceDate) ||
+            left.installmentNumber - right.installmentNumber ||
+            left.id.localeCompare(right.id),
+        )
+        .slice(0, payload.affectedInstallmentCount);
+      const operation: InstallmentOperation = {
+        id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+        planId: payload.planId,
+        type: 'anticipation',
+        operationDate: payload.operationDate,
+        affectedInstallmentCount: payload.affectedInstallmentCount,
+        affectedAmountInCents: eligibleOccurrences.reduce(
+          (sum, occurrence) => sum + occurrence.amountInCents,
+          0,
+        ),
+        createdAt:
+          state.installmentOperations.length === 0
+            ? '2026-05-06T12:35:00.000Z'
+            : '2026-05-06T12:55:00.000Z',
+      };
+
+      state.installmentOperations = [...state.installmentOperations, operation];
+
+      return mockJsonResponse({ operation });
+    }
+
+    if (pathname === '/api/v1/contracts' && method === 'GET') {
+      return mockJsonResponse({ snapshot: emptyContractsSnapshot });
+    }
+
+    if (pathname === '/api/v1/horizon' && method === 'GET') {
+      return mockJsonResponse({ snapshot: buildHorizonSnapshot() });
+    }
+
+    return mockJsonResponse({});
+  });
+}
+
 describe('App', () => {
   afterEach(() => {
     queryClient.clear();
@@ -1327,6 +1738,253 @@ describe('App', () => {
     expect(within(mayExpense as HTMLElement).getByText(/R\$\s*0,00/)).toBeInTheDocument();
     expect(within(juneExpense as HTMLElement).getByText(/R\$\s*600,00/)).toBeInTheDocument();
     expect(within(julyExpense as HTMLElement).getByText(/R\$\s*250,00/)).toBeInTheDocument();
+  });
+
+  it('gerencia parcelamentos e projeta compras parceladas pela shell web', async () => {
+    window.history.pushState({}, '', '/app/contas');
+
+    mockInstallmentShellFlow();
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Contas e saldo atual' }),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByPlaceholderText('Conta principal'), {
+      target: { value: 'Conta Parcelamentos Web' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('0'), {
+      target: { value: '500000' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Conta Parcelamentos Web')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('link', { name: 'Cartoes' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', {
+          name: 'Cartoes de credito e ciclo de fatura',
+        }),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByPlaceholderText('Ex.: Visa Platinum'), {
+      target: { value: 'Visa Parcelado Web' },
+    });
+    fireEvent.change(screen.getByLabelText('Limite em centavos'), {
+      target: { value: '400000' },
+    });
+    fireEvent.change(screen.getByLabelText('Fechamento'), {
+      target: { value: '25' },
+    });
+    fireEvent.change(screen.getByLabelText('Vencimento'), {
+      target: { value: '8' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Criar cartao' }));
+
+    const cardsSection = screen
+      .getByRole('heading', { name: 'Visao atual de limite, ciclo e fatura' })
+      .closest('article');
+
+    expect(cardsSection).not.toBeNull();
+
+    await waitFor(() => {
+      expect(
+        within(cardsSection as HTMLElement).getByText('Visa Parcelado Web'),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('link', { name: 'Parcelamentos' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', {
+          name: 'Parcelamentos, cronograma e antecipacoes',
+        }),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText('Descricao do parcelamento'), {
+      target: { value: 'Notebook parcelado' },
+    });
+    fireEvent.change(screen.getByLabelText('Valor total em centavos'), {
+      target: { value: '120000' },
+    });
+    fireEvent.change(screen.getByLabelText('Quantidade de parcelas'), {
+      target: { value: '4' },
+    });
+    fireEvent.change(screen.getByLabelText('Primeira ocorrencia'), {
+      target: { value: '2026-05-10' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Criar parcelamento' }));
+
+    await waitFor(() => {
+      const plansSection = screen
+        .getByRole('heading', { name: 'Parcelamentos cadastrados' })
+        .closest('article');
+
+      expect(plansSection).not.toBeNull();
+      expect(
+        within(plansSection as HTMLElement).getByText('Notebook parcelado'),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Editar parcelamento' }));
+    fireEvent.change(screen.getByLabelText('Descricao do parcelamento'), {
+      target: { value: 'Notebook parcelado ajustado' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Atualizar parcelamento' }));
+
+    await waitFor(() => {
+      const plansSection = screen
+        .getByRole('heading', { name: 'Parcelamentos cadastrados' })
+        .closest('article');
+
+      expect(plansSection).not.toBeNull();
+      expect(
+        within(plansSection as HTMLElement).getByText('Notebook parcelado ajustado'),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText('Data da antecipacao'), {
+      target: { value: '2026-05-05' },
+    });
+    fireEvent.change(screen.getByLabelText('Quantidade de parcelas afetadas'), {
+      target: { value: '3' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Antecipar parcelas' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('3 parcelas afetadas')).toBeInTheDocument();
+      expect(screen.getAllByText('Antecipada para 05/05/2026').length).toBeGreaterThan(0);
+    });
+
+    fireEvent.change(screen.getByLabelText('Origem do parcelamento'), {
+      target: { value: 'creditCard' },
+    });
+    fireEvent.change(screen.getByLabelText('Descricao do parcelamento'), {
+      target: { value: 'Curso parcelado' },
+    });
+    fireEvent.change(screen.getByLabelText('Valor total em centavos'), {
+      target: { value: '90000' },
+    });
+    fireEvent.change(screen.getByLabelText('Quantidade de parcelas'), {
+      target: { value: '3' },
+    });
+    fireEvent.change(screen.getByLabelText('Primeira ocorrencia'), {
+      target: { value: '2026-05-20' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Criar parcelamento' }));
+
+    await waitFor(() => {
+      const plansSection = screen
+        .getByRole('heading', { name: 'Parcelamentos cadastrados' })
+        .closest('article');
+
+      expect(plansSection).not.toBeNull();
+      expect(
+        within(plansSection as HTMLElement).getByText('Curso parcelado'),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText('Data da antecipacao'), {
+      target: { value: '2026-05-01' },
+    });
+    fireEvent.change(screen.getByLabelText('Quantidade de parcelas afetadas'), {
+      target: { value: '2' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Antecipar parcelas' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Compra projetada 1/3')).toBeInTheDocument();
+      expect(screen.getByText('Compra projetada 2/3')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('link', { name: 'Cartoes' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Compras no credito' }),
+      ).toBeInTheDocument();
+    });
+
+    const purchasesSection = screen
+      .getByRole('heading', { name: 'Compras no credito' })
+      .closest('article');
+    const projectedInvoicesSection = screen
+      .getByRole('heading', { name: 'Proximos vencimentos' })
+      .closest('article');
+
+    expect(purchasesSection).not.toBeNull();
+    expect(projectedInvoicesSection).not.toBeNull();
+
+    await waitFor(() => {
+      expect(
+        within(purchasesSection as HTMLElement).getByText('Curso parcelado 1/3'),
+      ).toBeInTheDocument();
+      expect(
+        within(purchasesSection as HTMLElement).getByText('Curso parcelado 2/3'),
+      ).toBeInTheDocument();
+      expect(
+        within(purchasesSection as HTMLElement).getAllByText('Gerada por parcelamento')
+          .length,
+      ).toBeGreaterThan(0);
+      expect(
+        within(projectedInvoicesSection as HTMLElement).getByText(/08\/06\/2026/),
+      ).toBeInTheDocument();
+      expect(
+        within(projectedInvoicesSection as HTMLElement).getByText(/08\/08\/2026/),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('link', { name: 'Visao geral' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', {
+          name: 'Horizonte oficial de 24 meses no backend.',
+        }),
+      ).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('2026-05-01')).toBeInTheDocument();
+      expect(screen.getByText('2026-06-01')).toBeInTheDocument();
+      expect(screen.getByText('2026-07-01')).toBeInTheDocument();
+      expect(screen.getByText('2026-08-01')).toBeInTheDocument();
+    });
+
+    const mayCard = screen.getByText('2026-05-01').closest('.horizon-list-card');
+    const juneCard = screen.getByText('2026-06-01').closest('.horizon-list-card');
+    const julyCard = screen.getByText('2026-07-01').closest('.horizon-list-card');
+    const augustCard = screen.getByText('2026-08-01').closest('.horizon-list-card');
+
+    expect(mayCard).not.toBeNull();
+    expect(juneCard).not.toBeNull();
+    expect(julyCard).not.toBeNull();
+    expect(augustCard).not.toBeNull();
+
+    const mayExpense = within(mayCard as HTMLElement).getByText('Saidas').closest('div');
+    const juneExpense = within(juneCard as HTMLElement).getByText('Saidas').closest('div');
+    const julyExpense = within(julyCard as HTMLElement).getByText('Saidas').closest('div');
+    const augustExpense = within(augustCard as HTMLElement).getByText('Saidas').closest('div');
+
+    expect(mayExpense).not.toBeNull();
+    expect(juneExpense).not.toBeNull();
+    expect(julyExpense).not.toBeNull();
+    expect(augustExpense).not.toBeNull();
+
+    expect(within(mayExpense as HTMLElement).getByText(/R\$\s*900,00/)).toBeInTheDocument();
+    expect(within(juneExpense as HTMLElement).getByText(/R\$\s*600,00/)).toBeInTheDocument();
+    expect(within(julyExpense as HTMLElement).getByText(/R\$\s*0,00/)).toBeInTheDocument();
+    expect(within(augustExpense as HTMLElement).getByText(/R\$\s*600,00/)).toBeInTheDocument();
   });
 
   it('mostra a tela de cadastro com o consentimento obrigatorio', async () => {

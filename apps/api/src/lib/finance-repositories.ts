@@ -4,6 +4,7 @@ import type {
   ArchiveAccountInput,
   Account,
   AccountListItem,
+  AnticipateInstallmentPlanInput,
   CreditCard,
   CreditCardInvoice,
   CreditCardListItem,
@@ -18,13 +19,20 @@ import type {
   CreateCreditCardPurchaseInput,
   CreateContractAdjustmentInput,
   CreateContractInput,
+  CreateInstallmentPlanInput,
   CreateTagInput,
   CreateTransactionInput,
   EndContractInput,
   HorizonSettings,
+  InstallmentOperation,
+  InstallmentPlan,
+  InstallmentPlanListItem,
+  InstallmentsSnapshot,
   ManualTransaction,
   Tag,
   TagListItem,
+  UpdateInstallmentAnticipationInput,
+  UpdateInstallmentPlanInput,
   UpdateCreditCardInput,
   UpdateCreditCardPurchaseInput,
   UpdateContractInput,
@@ -37,8 +45,13 @@ import {
   buildCreditCardPurchaseListItems,
   buildCurrentCreditCardCycle,
   buildCurrentCreditCardInvoicePreview,
+  buildInstallmentOccurrenceListItems,
+  buildProjectedInstallmentCreditCardPurchases,
+  buildProjectedInstallmentOccurrences,
   buildProjectedCreditCardInvoiceOccurrences,
   sanitizeAccountInput,
+  sanitizeInstallmentAnticipationInput,
+  sanitizeInstallmentPlanInput,
   sanitizeCreditCardInput,
   sanitizeCreditCardPurchaseInput,
   sanitizeContractInput,
@@ -209,6 +222,35 @@ type CreditCardPurchaseRow = QueryResultRow & {
   user_id: string;
 };
 
+type InstallmentPlanRow = QueryResultRow & {
+  account_id: string | null;
+  account_name?: string | null;
+  created_at: Date | string;
+  credit_card_id: string | null;
+  credit_card_name?: string | null;
+  description: string;
+  first_occurrence_date: Date | string;
+  id: string;
+  installment_count: number | string;
+  payment_account_id?: string | null;
+  payment_account_name?: string | null;
+  source_type: InstallmentPlan['sourceType'];
+  total_amount_in_cents: number | string;
+  updated_at: Date | string;
+  user_id: string;
+};
+
+type InstallmentOperationRow = QueryResultRow & {
+  affected_amount_in_cents: number | string;
+  affected_installment_count: number | string;
+  created_at: Date | string;
+  id: string;
+  operation_date: Date | string;
+  plan_id: string;
+  type: InstallmentOperation['type'];
+  user_id: string;
+};
+
 type LegacyImportBatchRow = QueryResultRow & {
   created_at: Date | string;
   id: string;
@@ -352,6 +394,44 @@ async function assertOwnedCreditCard(
       404,
       'FINANCE_CREDIT_CARD_NOT_FOUND',
       'Cartao nao encontrado para o usuario autenticado.',
+    );
+  }
+}
+
+async function assertOwnedInstallmentPlan(
+  database: DatabaseExecutor,
+  userId: string,
+  planId: string,
+): Promise<void> {
+  const result = await database.query<{ id: string }>(
+    'select id from finance.installment_plans where user_id = $1 and id = $2',
+    [userId, planId],
+  );
+
+  if ((result.rowCount ?? 0) === 0) {
+    throw new AppError(
+      404,
+      'FINANCE_INSTALLMENT_PLAN_NOT_FOUND',
+      'Parcelamento nao encontrado para o usuario autenticado.',
+    );
+  }
+}
+
+async function assertOwnedInstallmentOperation(
+  database: DatabaseExecutor,
+  userId: string,
+  operationId: string,
+): Promise<void> {
+  const result = await database.query<{ id: string }>(
+    'select id from finance.installment_operations where user_id = $1 and id = $2',
+    [userId, operationId],
+  );
+
+  if ((result.rowCount ?? 0) === 0) {
+    throw new AppError(
+      404,
+      'FINANCE_INSTALLMENT_OPERATION_NOT_FOUND',
+      'Operacao de parcelamento nao encontrada para o usuario autenticado.',
     );
   }
 }
@@ -644,6 +724,83 @@ function buildCreditCardsSnapshotFromRows(
   };
 }
 
+function mapInstallmentPlan(row: InstallmentPlanRow): InstallmentPlanListItem {
+  return {
+    accountId: row.account_id,
+    accountName: row.account_name ?? null,
+    createdAt: toIsoString(row.created_at),
+    creditCardId: row.credit_card_id,
+    creditCardName: row.credit_card_name ?? null,
+    description: row.description,
+    firstOccurrenceDate: toDateOnly(row.first_occurrence_date),
+    id: row.id,
+    installmentCount: toNumber(row.installment_count),
+    paymentAccountId: row.payment_account_id ?? null,
+    paymentAccountName: row.payment_account_name ?? null,
+    sourceType: row.source_type,
+    totalAmountInCents: toNumber(row.total_amount_in_cents),
+    updatedAt: toIsoString(row.updated_at),
+  };
+}
+
+function mapInstallmentOperation(
+  row: InstallmentOperationRow,
+): InstallmentOperation {
+  return {
+    affectedAmountInCents: toNumber(row.affected_amount_in_cents),
+    affectedInstallmentCount: toNumber(row.affected_installment_count),
+    createdAt: toIsoString(row.created_at),
+    id: row.id,
+    operationDate: toDateOnly(row.operation_date),
+    planId: row.plan_id,
+    type: row.type,
+  };
+}
+
+function buildInstallmentsSnapshotFromRows(
+  planRows: InstallmentPlanRow[],
+  operationRows: InstallmentOperationRow[],
+  currentDate?: string,
+): InstallmentsSnapshot {
+  if (planRows.length === 0) {
+    return {
+      occurrences: [],
+      operations: [],
+      plans: [],
+      projectedAccountOccurrences: [],
+      projectedCreditCardPurchases: [],
+      totalRemainingAmountInCents: 0,
+    };
+  }
+
+  const plans = planRows.map(mapInstallmentPlan);
+  const operations = operationRows.map(mapInstallmentOperation);
+  const occurrences = buildInstallmentOccurrenceListItems(plans, operations);
+  const projectedAccountOccurrences = buildProjectedInstallmentOccurrences(
+    occurrences,
+    currentDate,
+  );
+  const projectedCreditCardPurchases =
+    buildProjectedInstallmentCreditCardPurchases(occurrences, currentDate);
+
+  return {
+    occurrences,
+    operations,
+    plans,
+    projectedAccountOccurrences,
+    projectedCreditCardPurchases,
+    totalRemainingAmountInCents:
+      projectedAccountOccurrences.reduce(
+        (sum, occurrence) => sum + occurrence.amountInCents,
+        0,
+      ) +
+      projectedCreditCardPurchases.reduce(
+        (sum, purchase) => sum + purchase.amountInCents,
+        0,
+      ),
+  };
+}
+
 function mapTransactionListItem(row: ManualTransactionRow): TransactionListItem {
   const transaction = mapManualTransaction(row);
   const signedAmountInCents =
@@ -776,6 +933,48 @@ function buildCreditCardPurchasesSelect(whereClause: string) {
                    cc.due_day,
                    cc.payment_account_id,
                    a.name`;
+}
+
+function buildInstallmentsSelect(whereClause: string) {
+  return `select ip.id,
+                 ip.user_id,
+                 ip.source_type,
+                 ip.account_id,
+                 ip.credit_card_id,
+                 ip.description,
+                 ip.total_amount_in_cents,
+                 ip.installment_count,
+                 ip.first_occurrence_date,
+                 ip.created_at,
+                 ip.updated_at,
+                 a.name as account_name,
+                 cc.name as credit_card_name,
+                 cc.payment_account_id,
+                 pa.name as payment_account_name
+          from finance.installment_plans ip
+          left join finance.accounts a
+            on a.user_id = ip.user_id
+           and a.id = ip.account_id
+          left join finance.credit_cards cc
+            on cc.user_id = ip.user_id
+           and cc.id = ip.credit_card_id
+          left join finance.accounts pa
+            on pa.user_id = cc.user_id
+           and pa.id = cc.payment_account_id
+          ${whereClause}`;
+}
+
+function buildInstallmentOperationsSelect(whereClause: string) {
+  return `select io.id,
+                 io.user_id,
+                 io.installment_plan_id as plan_id,
+                 io.type,
+                 io.operation_date,
+                 io.affected_installment_count,
+                 io.affected_amount_in_cents,
+                 io.created_at
+          from finance.installment_operations io
+          ${whereClause}`;
 }
 
 export class UserSettingsRepository {
@@ -1339,6 +1538,392 @@ export class ContractsRepository {
     return result.rows.map((row) =>
       mapContractListItem(row, adjustmentsByContractId.get(row.id) ?? []),
     );
+  }
+}
+
+export class InstallmentsRepository {
+  constructor(private readonly database: DatabaseClient) {}
+
+  async create(
+    userId: string,
+    input: CreateInstallmentPlanInput,
+    now = new Date(),
+    database: DatabaseExecutor = this.database,
+  ): Promise<InstallmentPlanListItem> {
+    const sanitizedInput = sanitizeInstallmentPlanInput(input);
+    const nowIsoString = now.toISOString();
+
+    if (sanitizedInput.sourceType === 'account') {
+      await assertOwnedAccount(database, userId, sanitizedInput.accountId!);
+    } else {
+      await assertOwnedCreditCard(database, userId, sanitizedInput.creditCardId!);
+    }
+
+    const planId = randomUUID();
+
+    await database.query(
+      `insert into finance.installment_plans (
+         id,
+         user_id,
+         source_type,
+         account_id,
+         credit_card_id,
+         description,
+         total_amount_in_cents,
+         installment_count,
+         first_occurrence_date,
+         payload,
+         created_at,
+         updated_at
+       ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, '{}'::jsonb, $10, $11)`,
+      [
+        planId,
+        userId,
+        sanitizedInput.sourceType,
+        sanitizedInput.sourceType === 'account' ? sanitizedInput.accountId! : null,
+        sanitizedInput.sourceType === 'creditCard'
+          ? sanitizedInput.creditCardId!
+          : null,
+        sanitizedInput.description,
+        sanitizedInput.totalAmountInCents,
+        sanitizedInput.installmentCount,
+        sanitizedInput.firstOccurrenceDate,
+        nowIsoString,
+        nowIsoString,
+      ],
+    );
+
+    return (await this.findById(userId, planId, database))!;
+  }
+
+  async update(
+    userId: string,
+    input: UpdateInstallmentPlanInput,
+    now = new Date(),
+    database: DatabaseExecutor = this.database,
+  ): Promise<InstallmentPlanListItem> {
+    const sanitizedInput = sanitizeInstallmentPlanInput(input);
+    const nowIsoString = now.toISOString();
+
+    if (sanitizedInput.sourceType === 'account') {
+      await assertOwnedAccount(database, userId, sanitizedInput.accountId!);
+    } else {
+      await assertOwnedCreditCard(database, userId, sanitizedInput.creditCardId!);
+    }
+
+    const result = await database.query(
+      `update finance.installment_plans
+          set source_type = $3,
+              account_id = $4,
+              credit_card_id = $5,
+              description = $6,
+              total_amount_in_cents = $7,
+              installment_count = $8,
+              first_occurrence_date = $9,
+              updated_at = $10
+        where user_id = $1 and id = $2`,
+      [
+        userId,
+        sanitizedInput.id,
+        sanitizedInput.sourceType,
+        sanitizedInput.sourceType === 'account' ? sanitizedInput.accountId! : null,
+        sanitizedInput.sourceType === 'creditCard'
+          ? sanitizedInput.creditCardId!
+          : null,
+        sanitizedInput.description,
+        sanitizedInput.totalAmountInCents,
+        sanitizedInput.installmentCount,
+        sanitizedInput.firstOccurrenceDate,
+        nowIsoString,
+      ],
+    );
+
+    if ((result.rowCount ?? 0) === 0) {
+      throw new AppError(
+        404,
+        'FINANCE_INSTALLMENT_PLAN_NOT_FOUND',
+        'Parcelamento nao encontrado para o usuario autenticado.',
+      );
+    }
+
+    return (await this.findById(userId, sanitizedInput.id, database))!;
+  }
+
+  async anticipate(
+    userId: string,
+    input: AnticipateInstallmentPlanInput,
+    now = new Date(),
+    database?: DatabaseExecutor,
+  ): Promise<InstallmentOperation> {
+    const sanitizedInput = sanitizeInstallmentAnticipationInput(input);
+
+    if (database) {
+      return this.createAnticipationWithinTransaction(
+        database,
+        userId,
+        sanitizedInput,
+        now,
+      );
+    }
+
+    return this.database.runInTransaction((transaction) =>
+      this.createAnticipationWithinTransaction(
+        transaction,
+        userId,
+        sanitizedInput,
+        now,
+      ),
+    );
+  }
+
+  async updateAnticipation(
+    userId: string,
+    input: UpdateInstallmentAnticipationInput,
+    database?: DatabaseExecutor,
+  ): Promise<InstallmentOperation> {
+    const sanitizedInput = sanitizeInstallmentAnticipationInput(input);
+
+    if (database) {
+      return this.updateAnticipationWithinTransaction(
+        database,
+        userId,
+        sanitizedInput,
+      );
+    }
+
+    return this.database.runInTransaction((transaction) =>
+      this.updateAnticipationWithinTransaction(
+        transaction,
+        userId,
+        sanitizedInput,
+      ),
+    );
+  }
+
+  async findById(
+    userId: string,
+    planId: string,
+    database: DatabaseExecutor = this.database,
+  ): Promise<InstallmentPlanListItem | null> {
+    const result = await database.query<InstallmentPlanRow>(
+      `${buildInstallmentsSelect('where ip.user_id = $1 and ip.id = $2')}`,
+      [userId, planId],
+    );
+
+    return result.rows[0] ? mapInstallmentPlan(result.rows[0]) : null;
+  }
+
+  async findOperationById(
+    userId: string,
+    operationId: string,
+    database: DatabaseExecutor = this.database,
+  ): Promise<InstallmentOperation | null> {
+    const result = await database.query<InstallmentOperationRow>(
+      `${buildInstallmentOperationsSelect('where io.user_id = $1 and io.id = $2')}`,
+      [userId, operationId],
+    );
+
+    return result.rows[0] ? mapInstallmentOperation(result.rows[0]) : null;
+  }
+
+  async listByUserId(userId: string): Promise<InstallmentPlanListItem[]> {
+    const result = await this.database.query<InstallmentPlanRow>(
+      `${buildInstallmentsSelect('where ip.user_id = $1')}
+       order by ip.first_occurrence_date asc, ip.description asc`,
+      [userId],
+    );
+
+    return result.rows.map(mapInstallmentPlan);
+  }
+
+  async listOperationsByUserId(userId: string): Promise<InstallmentOperation[]> {
+    const result = await this.database.query<InstallmentOperationRow>(
+      `${buildInstallmentOperationsSelect('where io.user_id = $1')}
+       order by io.operation_date desc, io.created_at desc, io.id desc`,
+      [userId],
+    );
+
+    return result.rows.map(mapInstallmentOperation);
+  }
+
+  async getSnapshot(
+    userId: string,
+    currentDate: string,
+  ): Promise<InstallmentsSnapshot> {
+    const [planRows, operationRows] = await Promise.all([
+      this.database.query<InstallmentPlanRow>(
+        `${buildInstallmentsSelect('where ip.user_id = $1')}
+         order by ip.first_occurrence_date asc, ip.description asc`,
+        [userId],
+      ),
+      this.database.query<InstallmentOperationRow>(
+        `${buildInstallmentOperationsSelect('where io.user_id = $1')}
+         order by io.operation_date asc, io.created_at asc, io.id asc`,
+        [userId],
+      ),
+    ]);
+
+    return buildInstallmentsSnapshotFromRows(
+      planRows.rows,
+      operationRows.rows,
+      currentDate,
+    );
+  }
+
+  private async createAnticipationWithinTransaction(
+    transaction: DatabaseExecutor,
+    userId: string,
+    sanitizedInput: AnticipateInstallmentPlanInput,
+    now: Date,
+  ): Promise<InstallmentOperation> {
+    const anticipation = await this.prepareAnticipation(
+      transaction,
+      userId,
+      sanitizedInput,
+    );
+    const operationId = randomUUID();
+    const nowIsoString = now.toISOString();
+
+    await transaction.query(
+      `insert into finance.installment_operations (
+         id,
+         user_id,
+         installment_plan_id,
+         type,
+         operation_date,
+         affected_installment_count,
+         affected_amount_in_cents,
+         payload,
+         created_at
+       ) values ($1, $2, $3, 'anticipation', $4, $5, $6, '{}'::jsonb, $7)`,
+      [
+        operationId,
+        userId,
+        anticipation.planId,
+        sanitizedInput.operationDate,
+        anticipation.affectedInstallmentCount,
+        anticipation.affectedAmountInCents,
+        nowIsoString,
+      ],
+    );
+
+    return (await this.findOperationById(userId, operationId, transaction))!;
+  }
+
+  private async updateAnticipationWithinTransaction(
+    transaction: DatabaseExecutor,
+    userId: string,
+    sanitizedInput: UpdateInstallmentAnticipationInput,
+  ): Promise<InstallmentOperation> {
+    await assertOwnedInstallmentOperation(transaction, userId, sanitizedInput.id);
+
+    const anticipation = await this.prepareAnticipation(
+      transaction,
+      userId,
+      sanitizedInput,
+      sanitizedInput.id,
+    );
+
+    await transaction.query(
+      `update finance.installment_operations
+          set installment_plan_id = $3,
+              operation_date = $4,
+              affected_installment_count = $5,
+              affected_amount_in_cents = $6
+        where user_id = $1 and id = $2`,
+      [
+        userId,
+        sanitizedInput.id,
+        anticipation.planId,
+        sanitizedInput.operationDate,
+        anticipation.affectedInstallmentCount,
+        anticipation.affectedAmountInCents,
+      ],
+    );
+
+    return (await this.findOperationById(
+      userId,
+      sanitizedInput.id,
+      transaction,
+    ))!;
+  }
+
+  private async prepareAnticipation(
+    transaction: DatabaseExecutor,
+    userId: string,
+    input:
+      | AnticipateInstallmentPlanInput
+      | UpdateInstallmentAnticipationInput,
+    excludedOperationId?: string,
+  ): Promise<{
+    affectedAmountInCents: number;
+    affectedInstallmentCount: number;
+    planId: string;
+  }> {
+    await assertOwnedInstallmentPlan(transaction, userId, input.planId);
+
+    const planRows = await transaction.query<InstallmentPlanRow>(
+      `${buildInstallmentsSelect('where ip.user_id = $1 and ip.id = $2')}`,
+      [userId, input.planId],
+    );
+    const operationRows = await transaction.query<InstallmentOperationRow>(
+      `${buildInstallmentOperationsSelect(
+        excludedOperationId
+          ? 'where io.user_id = $1 and io.installment_plan_id = $2 and io.id <> $3'
+          : 'where io.user_id = $1 and io.installment_plan_id = $2',
+      )}
+       order by io.operation_date asc, io.created_at asc, io.id asc`,
+      excludedOperationId
+        ? [userId, input.planId, excludedOperationId]
+        : [userId, input.planId],
+    );
+
+    const snapshot = buildInstallmentsSnapshotFromRows(
+      planRows.rows,
+      operationRows.rows,
+    );
+    const eligibleOccurrences = snapshot.occurrences
+      .filter((occurrence) => occurrence.occurrenceDate > input.operationDate)
+      .sort(
+        (left, right) =>
+          left.occurrenceDate.localeCompare(right.occurrenceDate) ||
+          left.installmentNumber - right.installmentNumber ||
+          left.id.localeCompare(right.id),
+      );
+
+    if (eligibleOccurrences.length === 0) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', [
+        {
+          field: 'operationDate',
+          message:
+            'Nao existem parcelas restantes elegiveis para antecipacao nessa data.',
+        },
+      ]);
+    }
+
+    if (input.affectedInstallmentCount > eligibleOccurrences.length) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', [
+        {
+          field: 'affectedInstallmentCount',
+          message:
+            'A quantidade informada excede as parcelas restantes elegiveis para antecipacao.',
+        },
+      ]);
+    }
+
+    const affectedOccurrences = eligibleOccurrences.slice(
+      0,
+      input.affectedInstallmentCount,
+    );
+
+    return {
+      affectedAmountInCents: affectedOccurrences.reduce(
+        (sum, occurrence) => sum + occurrence.amountInCents,
+        0,
+      ),
+      affectedInstallmentCount: input.affectedInstallmentCount,
+      planId: input.planId,
+    };
   }
 }
 
@@ -2245,6 +2830,8 @@ export class FinancialDataAccess {
 
   readonly contracts: ContractsRepository;
 
+  readonly installments: InstallmentsRepository;
+
   readonly legacyImport: LegacyImportRepository;
 
   readonly manualTransactions: ManualTransactionsRepository;
@@ -2257,6 +2844,7 @@ export class FinancialDataAccess {
     this.accounts = new AccountsRepository(database);
     this.creditCards = new CreditCardsRepository(database);
     this.contracts = new ContractsRepository(database);
+    this.installments = new InstallmentsRepository(database);
     this.legacyImport = new LegacyImportRepository(database);
     this.manualTransactions = new ManualTransactionsRepository(database);
     this.tags = new TagsRepository(database);
