@@ -2,6 +2,7 @@ import type {
   Account,
   AccountsSnapshot,
   AnticipateInstallmentPlanInput,
+  CreateTagInput,
   CreditCardListItem,
   CreditCardPurchaseListItem,
   CreditCardsSnapshot,
@@ -17,6 +18,9 @@ import type {
   CreateProvisionInput,
   CreateTransactionInput,
   EndContractInput,
+  FinancialAnalyticsSnapshot,
+  FinancialRecordFilter,
+  FinancialRecordQuerySnapshot,
   HorizonSnapshot,
   InstallmentOperation,
   InstallmentPlanListItem,
@@ -32,6 +36,8 @@ import type {
   RedeemProvisionInput,
   RemoveVariableExpenseOverrideInput,
   SessionPayload,
+  TagListItem,
+  TagsSnapshot,
   TransactionsSnapshot,
   UpdateAccountInput,
   UpdateCreditCardInput,
@@ -40,6 +46,7 @@ import type {
   UpdateHorizonSettingsInput,
   UpdateInstallmentPlanInput,
   UpdateProvisionInput,
+  UpdateTagInput,
   UpdateTransactionInput,
   VariableExpenseOverride,
   VariableExpenseOverrideListItem,
@@ -82,6 +89,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return data as T;
+}
+
+function buildQueryString(filters: FinancialRecordFilter) {
+  const params = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(filters)) {
+    if (typeof value === 'string' && value) {
+      params.set(key, value);
+    }
+  }
+
+  const query = params.toString();
+
+  return query ? `?${query}` : '';
 }
 
 export const authApi = {
@@ -162,6 +183,29 @@ export const financeApi = {
   async getTransactionsSnapshot(): Promise<TransactionsSnapshot> {
     const payload = await request<{ snapshot: TransactionsSnapshot }>(
       '/api/v1/transactions',
+    );
+
+    return payload.snapshot;
+  },
+  async getTagsSnapshot(): Promise<TagsSnapshot> {
+    const payload = await request<{ snapshot: TagsSnapshot }>('/api/v1/tags');
+
+    return payload.snapshot;
+  },
+  async getFinancialRecords(
+    filters: FinancialRecordFilter = {},
+  ): Promise<FinancialRecordQuerySnapshot> {
+    const payload = await request<{ snapshot: FinancialRecordQuerySnapshot }>(
+      `/api/v1/records${buildQueryString(filters)}`,
+    );
+
+    return payload.snapshot;
+  },
+  async getFinancialAnalytics(
+    filters: FinancialRecordFilter = {},
+  ): Promise<FinancialAnalyticsSnapshot> {
+    const payload = await request<{ snapshot: FinancialAnalyticsSnapshot }>(
+      `/api/v1/analytics${buildQueryString(filters)}`,
     );
 
     return payload.snapshot;
@@ -260,6 +304,14 @@ export const financeApi = {
 
     return payload.provision;
   },
+  async createTag(input: CreateTagInput): Promise<TagListItem> {
+    const payload = await request<{ tag: TagListItem }>('/api/v1/tags', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+
+    return payload.tag;
+  },
   async updateCreditCard(input: UpdateCreditCardInput): Promise<CreditCardListItem> {
     const payload = await request<{ creditCard: CreditCardListItem }>(
       `/api/v1/credit-cards/${input.id}`,
@@ -294,6 +346,16 @@ export const financeApi = {
     );
 
     return payload.provision;
+  },
+  async updateTag(input: UpdateTagInput): Promise<TagListItem> {
+    const payload = await request<{ tag: TagListItem }>(`/api/v1/tags/${input.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        name: input.name,
+      }),
+    });
+
+    return payload.tag;
   },
   async updateInstallmentPlan(
     input: UpdateInstallmentPlanInput,
@@ -473,6 +535,13 @@ export const financeApi = {
     return request(`/api/v1/transactions/${id}`, {
       method: 'DELETE',
     });
+  },
+  async deleteTag(id: string): Promise<TagListItem> {
+    const payload = await request<{ tag: TagListItem }>(`/api/v1/tags/${id}`, {
+      method: 'DELETE',
+    });
+
+    return payload.tag;
   },
   async removeVariableExpenseOverride(
     input: RemoveVariableExpenseOverrideInput,

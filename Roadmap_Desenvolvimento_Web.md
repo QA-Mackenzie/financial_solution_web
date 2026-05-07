@@ -643,6 +643,8 @@ O horizonte web passa a representar nao apenas o historico e o fixo, mas tambem 
 
 ## Sprint 9 - Tags, categorias, consulta e analytics
 
+Status: concluida em 2026-05-07
+
 ### Objetivo
 
 Entregar a camada de leitura e investigacao dos dados financeiros para uso diario e decisao.
@@ -656,20 +658,47 @@ Entregar a camada de leitura e investigacao dos dados financeiros para uso diari
 
 ### Backlog recomendado
 
-- [ ] Fechar a decisao de produto para categorias: manter catalogo estatico na R1 ou persistir catalogo customizavel
-- [ ] Implementar CRUD de tags e associacao a transacoes e compras no credito
-- [ ] Portar tagInput e analyticsSnapshot
-- [ ] Criar endpoints de analytics por periodo, categoria, tag e entidade financeira
-- [ ] Criar tela de consulta de lancamentos com filtros por periodo, conta, categoria, tag e tipo
-- [ ] Criar tela de analytics com visoes sumarizadas, tabelares e graficos leves se aprovados
-- [ ] Criar testes de integracao para consultas e agregacoes
-- [ ] Criar E2E cobrindo filtro cruzado por categoria e tag
-- [ ] Revisar performance de consultas agregadas em bases medias e grandes
-- [ ] Documentar limites de escopo da R1 para analytics e categorias
+- [x] Fechar a decisao de produto para categorias: manter catalogo estatico na R1 ou persistir catalogo customizavel
+- [x] Implementar CRUD de tags e associacao a transacoes e compras no credito
+- [x] Portar tagInput e analyticsSnapshot
+- [x] Criar endpoints de analytics por periodo, categoria, tag e entidade financeira
+- [x] Criar tela de consulta de lancamentos com filtros por periodo, conta, categoria, tag e tipo
+- [x] Criar tela de analytics com visoes sumarizadas, tabelares e graficos leves se aprovados
+- [x] Criar testes de integracao para consultas e agregacoes
+- [x] Criar E2E cobrindo filtro cruzado por categoria e tag
+- [x] Revisar performance de consultas agregadas em bases medias e grandes
+- [x] Documentar limites de escopo da R1 para analytics e categorias
 
 ### Gate de saida
 
 O usuario consegue nao apenas registrar e projetar, mas tambem ler e analisar seus dados com filtros consistentes.
+
+### Implementado nesta sprint
+
+- decisao de produto fechada para manter o catalogo de categorias estatico na R1, versionado em packages/contracts/src/category.ts e reutilizado por web, API e dominio sem CRUD customizavel
+- contratos compartilhados de tags e analytics ampliados em packages/contracts, com port de tagInput, snapshots de consulta financeira e snapshots analiticos por categoria, tag, entidade e mes
+- builders puros de analytics adicionados em packages/domain-core para filtrar registros financeiros combinados e gerar agregacoes owner-scoped reutilizadas pela API
+- FinanceService e rotas HTTP da API expandidos com CRUD de tags, consulta unificada de registros e endpoints de analytics sobre lancamentos manuais e compras no credito
+- telas web de lancamentos e cartoes atualizadas para usar categorias estaticas, selecao de tags e leitura visual com badges e filtros consistentes
+- nova tela Analytics na shell privada com filtros por conta, categoria, tag, periodo, origem e entidade, alem de resumo executivo, preview de registros e breakdowns por categoria, tag, entidade e mes
+- testes HTTP dedicados na API cobrindo CRUD de tags, consulta filtrada, analytics combinado, auditoria e isolamento por usuario
+- teste de shell web cobrindo CRUD de tags na tela de analytics e filtro cruzado sobre os registros consolidados
+- revisao da estrategia de performance da R1 concluida com manutencao da agregacao no backend sobre registros ja filtrados por user_id, sem agregacoes cross-tenant e sem necessidade de migracao adicional de schema para esta release
+
+### Limites de escopo da R1
+
+- categorias permanecem estaticas e definidas em codigo; nao existe catalogo customizavel por usuario nesta release
+- analytics da R1 consolida lancamentos manuais e compras no credito, sem expandir ainda para contratos, provisoes, parcelamentos e outras leituras derivadas especializadas
+- as agregacoes sao calculadas no backend a partir do conjunto owner-scoped do usuario autenticado, priorizando consistencia funcional e simplicidade operacional na primeira release
+
+### Validacao executada
+
+- npm run lint
+- npm run typecheck
+- npm run test
+- npx -y node@20 "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js" run build
+- npm run infra:up
+- npm run db:check
 
 ---
 

@@ -3,6 +3,8 @@ import type {
   AccountsSnapshot,
   CreditCard,
   CreditCardPurchase,
+  FinancialRecordFilter,
+  FinancialRecordListItem,
   ContractsSnapshot,
   HorizonSnapshot,
   InstallmentOperation,
@@ -11,6 +13,8 @@ import type {
   ProvisionListItem,
   ProvisionsPlanningSnapshot,
   SessionPayload,
+  TagsSnapshot,
+  TagListItem,
   TransactionsSnapshot,
   VariableExpenseOverrideListItem,
   VariableExpenseSnapshot,
@@ -21,7 +25,9 @@ import {
   buildCreditCardPurchaseListItems,
   buildCurrentCreditCardCycle,
   buildCurrentCreditCardInvoicePreview,
+  buildFinancialAnalyticsSnapshot,
   buildFinancialHorizon,
+  buildFinancialRecordQuerySnapshot,
   buildInstallmentOccurrenceListItems,
   buildProjectedCreditCardInvoiceOccurrences,
   buildProjectedInstallmentCreditCardPurchases,
@@ -54,6 +60,10 @@ const emptyProvisionsPlanningSnapshot: ProvisionsPlanningSnapshot = {
 const emptyVariableExpenseSnapshot: VariableExpenseSnapshot = {
   overrides: [],
   projectedOccurrences: [],
+};
+
+const emptyTagsSnapshot: TagsSnapshot = {
+  tags: [],
 };
 
 function mockAuthenticatedShellResponses() {
@@ -142,6 +152,10 @@ function mockAuthenticatedShellResponses() {
       return mockJsonResponse({ snapshot: emptyVariableExpenseSnapshot });
     }
 
+    if (pathname === '/api/v1/tags') {
+      return mockJsonResponse({ snapshot: emptyTagsSnapshot });
+    }
+
     return mockJsonResponse({});
   });
 }
@@ -174,6 +188,7 @@ function mockInteractiveFinanceFlow() {
       type: 'income' | 'expense';
       description: string;
       category?: string;
+      tagIds?: string[];
       amountInCents: number;
       transactionDate: string;
       createdAt: string;
@@ -262,7 +277,7 @@ function mockInteractiveFinanceFlow() {
           transaction.type === 'income'
             ? transaction.amountInCents
             : -transaction.amountInCents,
-        tagIds: undefined,
+        tagIds: transaction.tagIds,
       }));
 
     return {
@@ -605,6 +620,7 @@ function mockInteractiveFinanceFlow() {
         amountInCents: number;
         category?: string;
         description: string;
+        tagIds?: string[];
         transactionDate: string;
         type: 'income' | 'expense';
       };
@@ -618,6 +634,7 @@ function mockInteractiveFinanceFlow() {
         category: payload.category,
         createdAt: '2026-05-06T12:30:00.000Z',
         description: payload.description,
+        tagIds: payload.tagIds,
         transactionDate: payload.transactionDate,
         type: payload.type,
         updatedAt: '2026-05-06T12:30:00.000Z',
@@ -641,6 +658,10 @@ function mockInteractiveFinanceFlow() {
       state.settings = payload;
 
       return mockJsonResponse({ settings: payload });
+    }
+
+    if (pathname === '/api/v1/tags' && method === 'GET') {
+      return mockJsonResponse({ snapshot: emptyTagsSnapshot });
     }
 
     return mockJsonResponse({});
@@ -829,6 +850,10 @@ function mockCreditCardShellFlow() {
       return mockJsonResponse({ account });
     }
 
+    if (pathname === '/api/v1/tags' && method === 'GET') {
+      return mockJsonResponse({ snapshot: emptyTagsSnapshot });
+    }
+
     if (pathname === '/api/v1/credit-cards' && method === 'GET') {
       return mockJsonResponse({ snapshot: buildCreditCardsSnapshot() });
     }
@@ -891,6 +916,7 @@ function mockCreditCardShellFlow() {
         creditCardId: string;
         description: string;
         category?: string;
+        tagIds?: string[];
         amountInCents: number;
         purchaseDate: string;
       };
@@ -902,6 +928,7 @@ function mockCreditCardShellFlow() {
         creditCardId: payload.creditCardId,
         description: payload.description,
         category: payload.category,
+        tagIds: payload.tagIds,
         amountInCents: payload.amountInCents,
         purchaseDate: payload.purchaseDate,
         createdAt: '2026-05-06T12:30:00.000Z',
@@ -925,6 +952,7 @@ function mockCreditCardShellFlow() {
         creditCardId: string;
         description: string;
         category?: string;
+        tagIds?: string[];
         amountInCents: number;
         purchaseDate: string;
       };
@@ -960,6 +988,10 @@ function mockCreditCardShellFlow() {
 
     if (pathname === '/api/v1/horizon' && method === 'GET') {
       return mockJsonResponse({ snapshot: buildHorizonSnapshot() });
+    }
+
+    if (pathname === '/api/v1/tags' && method === 'GET') {
+      return mockJsonResponse({ snapshot: emptyTagsSnapshot });
     }
 
     return mockJsonResponse({});
@@ -1176,6 +1208,10 @@ function mockInstallmentShellFlow() {
       state.accounts = [account];
 
       return mockJsonResponse({ account });
+    }
+
+    if (pathname === '/api/v1/tags' && method === 'GET') {
+      return mockJsonResponse({ snapshot: emptyTagsSnapshot });
     }
 
     if (pathname === '/api/v1/credit-cards' && method === 'GET') {
@@ -1783,6 +1819,281 @@ function mockProvisionShellFlow() {
   });
 }
 
+function mockAnalyticsShellFlow() {
+  const session: SessionPayload = {
+    user: {
+      id: '92f49d09-7671-4518-bd08-c566ce68636a',
+      name: 'Alexandre Demo',
+      email: 'alexandre@example.com',
+      emailVerifiedAt: null,
+    },
+    expiresAt: '2026-01-08T12:00:00.000Z',
+    issuedAt: '2026-01-01T12:00:00.000Z',
+  };
+  const state = {
+    accounts: [
+      {
+        id: '11111111-1111-4111-8111-111111111111',
+        name: 'Conta Principal Web',
+        type: 'checking' as const,
+        openingBalanceInCents: 180000,
+        isArchived: false,
+        archivedAt: null,
+        createdAt: '2026-01-01T12:00:00.000Z',
+        updatedAt: '2026-01-01T12:00:00.000Z',
+      },
+    ],
+    records: [
+      {
+        id: 'record-1',
+        recordKind: 'manualTransaction' as const,
+        entityKind: 'account' as const,
+        entityId: '11111111-1111-4111-8111-111111111111',
+        entityName: 'Conta Principal Web',
+        accountId: '11111111-1111-4111-8111-111111111111',
+        accountName: 'Conta Principal Web',
+        type: 'income' as const,
+        description: 'Salario maio',
+        category: 'Trabalho',
+        tags: [
+          {
+            id: '22222222-2222-4222-8222-222222222222',
+            name: 'Cliente',
+          },
+        ],
+        amountInCents: 300000,
+        signedAmountInCents: 300000,
+        occurrenceDate: '2026-05-05',
+        createdAt: '2026-05-05T12:00:00.000Z',
+        updatedAt: '2026-05-05T12:00:00.000Z',
+      },
+      {
+        id: 'record-2',
+        recordKind: 'manualTransaction' as const,
+        entityKind: 'account' as const,
+        entityId: '11111111-1111-4111-8111-111111111111',
+        entityName: 'Conta Principal Web',
+        accountId: '11111111-1111-4111-8111-111111111111',
+        accountName: 'Conta Principal Web',
+        type: 'expense' as const,
+        description: 'Aluguel maio',
+        category: 'Casa',
+        tags: [
+          {
+            id: '33333333-3333-4333-8333-333333333333',
+            name: 'Essencial',
+          },
+        ],
+        amountInCents: 120000,
+        signedAmountInCents: -120000,
+        occurrenceDate: '2026-05-10',
+        createdAt: '2026-05-10T12:00:00.000Z',
+        updatedAt: '2026-05-10T12:00:00.000Z',
+      },
+      {
+        id: 'record-3',
+        recordKind: 'creditCardPurchase' as const,
+        entityKind: 'creditCard' as const,
+        entityId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        entityName: 'Visa Corporativo',
+        accountId: '11111111-1111-4111-8111-111111111111',
+        accountName: 'Conta Principal Web',
+        type: 'expense' as const,
+        description: 'Hotel cliente',
+        category: 'Viagem',
+        tags: [
+          {
+            id: '22222222-2222-4222-8222-222222222222',
+            name: 'Cliente',
+          },
+        ],
+        amountInCents: 90000,
+        signedAmountInCents: -90000,
+        occurrenceDate: '2026-05-18',
+        createdAt: '2026-05-18T12:00:00.000Z',
+        updatedAt: '2026-05-18T12:00:00.000Z',
+      },
+    ] as FinancialRecordListItem[],
+    tags: [
+      {
+        id: '22222222-2222-4222-8222-222222222222',
+        name: 'Cliente',
+        usageCount: 2,
+        createdAt: '2026-05-01T12:00:00.000Z',
+        updatedAt: '2026-05-01T12:00:00.000Z',
+      },
+      {
+        id: '33333333-3333-4333-8333-333333333333',
+        name: 'Essencial',
+        usageCount: 1,
+        createdAt: '2026-05-01T12:10:00.000Z',
+        updatedAt: '2026-05-01T12:10:00.000Z',
+      },
+    ] as TagListItem[],
+  };
+
+  function buildAccountsSnapshot(): AccountsSnapshot {
+    return {
+      activeAccounts: state.accounts.map((account) => ({
+        ...account,
+        currentBalanceInCents: account.openingBalanceInCents,
+      })),
+      archivedAccounts: [],
+      consolidatedBalanceInCents: state.accounts.reduce(
+        (sum, account) => sum + account.openingBalanceInCents,
+        0,
+      ),
+    };
+  }
+
+  function buildTagsSnapshot(): TagsSnapshot {
+    return {
+      tags: state.tags.map((tag) => ({
+        ...tag,
+        usageCount: state.records.filter((record) =>
+          record.tags.some((recordTag) => recordTag.id === tag.id),
+        ).length,
+      })),
+    };
+  }
+
+  function parseFilters(url: URL): FinancialRecordFilter {
+    const filters: FinancialRecordFilter = {};
+    const accountId = url.searchParams.get('accountId');
+    const category = url.searchParams.get('category');
+    const entityId = url.searchParams.get('entityId');
+    const entityKind = url.searchParams.get('entityKind');
+    const fromDate = url.searchParams.get('fromDate');
+    const recordKind = url.searchParams.get('recordKind');
+    const tagId = url.searchParams.get('tagId');
+    const toDate = url.searchParams.get('toDate');
+    const type = url.searchParams.get('type');
+
+    if (accountId) {
+      filters.accountId = accountId;
+    }
+
+    if (category) {
+      filters.category = category;
+    }
+
+    if (entityId) {
+      filters.entityId = entityId;
+    }
+
+    if (entityKind === 'account' || entityKind === 'creditCard') {
+      filters.entityKind = entityKind;
+    }
+
+    if (fromDate) {
+      filters.fromDate = fromDate;
+    }
+
+    if (recordKind === 'manualTransaction' || recordKind === 'creditCardPurchase') {
+      filters.recordKind = recordKind;
+    }
+
+    if (tagId) {
+      filters.tagId = tagId;
+    }
+
+    if (toDate) {
+      filters.toDate = toDate;
+    }
+
+    if (type === 'income' || type === 'expense') {
+      filters.type = type;
+    }
+
+    return filters;
+  }
+
+  function nextUuid(serial: number) {
+    return `90000000-0000-4000-8000-${String(serial).padStart(12, '0')}`;
+  }
+
+  return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    const urlValue = input instanceof Request ? input.url : String(input);
+    const url = new URL(urlValue);
+    const pathname = url.pathname;
+    const method = (init?.method ?? 'GET').toUpperCase();
+
+    if (pathname === '/api/v1/session') {
+      return mockJsonResponse({ session });
+    }
+
+    if (pathname === '/api/v1/accounts' && method === 'GET') {
+      return mockJsonResponse({ snapshot: buildAccountsSnapshot() });
+    }
+
+    if (pathname === '/api/v1/tags' && method === 'GET') {
+      return mockJsonResponse({ snapshot: buildTagsSnapshot() });
+    }
+
+    if (pathname === '/api/v1/tags' && method === 'POST') {
+      const payload = JSON.parse(String(init?.body)) as { name: string };
+      const tag: TagListItem = {
+        id: nextUuid(state.tags.length + 1),
+        name: payload.name,
+        usageCount: 0,
+        createdAt: '2026-05-20T12:00:00.000Z',
+        updatedAt: '2026-05-20T12:00:00.000Z',
+      };
+
+      state.tags = [...state.tags, tag];
+
+      return mockJsonResponse({ tag });
+    }
+
+    const tagMatch = pathname.match(/^\/api\/v1\/tags\/([^/]+)$/);
+
+    if (tagMatch && method === 'PUT') {
+      const tagId = tagMatch[1] ?? '';
+      const payload = JSON.parse(String(init?.body)) as { name: string };
+      let updatedTag = null as TagListItem | null;
+
+      state.tags = state.tags.map((tag) => {
+        if (tag.id !== tagId) {
+          return tag;
+        }
+
+        updatedTag = {
+          ...tag,
+          name: payload.name,
+          updatedAt: '2026-05-20T12:10:00.000Z',
+        };
+
+        return updatedTag;
+      });
+
+      return mockJsonResponse({ tag: updatedTag });
+    }
+
+    if (tagMatch && method === 'DELETE') {
+      const tagId = tagMatch[1] ?? '';
+      const deletedTag = buildTagsSnapshot().tags.find((tag) => tag.id === tagId) ?? null;
+
+      state.tags = state.tags.filter((tag) => tag.id !== tagId);
+
+      return mockJsonResponse({ tag: deletedTag });
+    }
+
+    if (pathname === '/api/v1/records' && method === 'GET') {
+      return mockJsonResponse({
+        snapshot: buildFinancialRecordQuerySnapshot(state.records, parseFilters(url)),
+      });
+    }
+
+    if (pathname === '/api/v1/analytics' && method === 'GET') {
+      return mockJsonResponse({
+        snapshot: buildFinancialAnalyticsSnapshot(state.records, parseFilters(url)),
+      });
+    }
+
+    return mockJsonResponse({});
+  });
+}
+
 describe('App', () => {
   afterEach(() => {
     queryClient.clear();
@@ -1826,6 +2137,114 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Recorrencias ativas' })).toBeInTheDocument();
   });
 
+  it('gerencia tags e filtros na tela de analytics pela shell web', async () => {
+    window.history.pushState({}, '', '/app/analytics');
+
+    mockAnalyticsShellFlow();
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Analytics financeiro consolidado' }),
+      ).toBeInTheDocument();
+    });
+
+    const tagEditorSection = screen
+      .getByRole('heading', { name: 'Nova tag' })
+      .closest('article');
+    const filterSection = screen
+      .getByRole('heading', { name: 'Recorte analitico' })
+      .closest('article');
+    const recordsSection = screen
+      .getByRole('heading', { name: 'Preview do fluxo financeiro filtrado' })
+      .closest('article');
+    const byEntitySection = screen
+      .getByRole('heading', { name: 'Impacto por conta e cartao' })
+      .closest('article');
+
+    expect(tagEditorSection).not.toBeNull();
+    expect(filterSection).not.toBeNull();
+    expect(recordsSection).not.toBeNull();
+    expect(byEntitySection).not.toBeNull();
+
+    fireEvent.change(within(tagEditorSection as HTMLElement).getByLabelText('Nome da tag'), {
+      target: { value: 'Projeto X' },
+    });
+    fireEvent.click(
+      within(tagEditorSection as HTMLElement).getByRole('button', { name: 'Criar tag' }),
+    );
+
+    await waitFor(() => {
+      expect(
+        within(tagEditorSection as HTMLElement).getByText('Projeto X'),
+      ).toBeInTheDocument();
+    });
+
+    const createdTagCard = within(tagEditorSection as HTMLElement)
+      .getByText('Projeto X')
+      .closest('.entity-card');
+
+    expect(createdTagCard).not.toBeNull();
+
+    fireEvent.click(
+      within(createdTagCard as HTMLElement).getByRole('button', { name: 'Editar' }),
+    );
+    fireEvent.change(within(tagEditorSection as HTMLElement).getByLabelText('Nome da tag'), {
+      target: { value: 'Projeto VIP' },
+    });
+    fireEvent.click(
+      within(tagEditorSection as HTMLElement).getByRole('button', {
+        name: 'Atualizar tag',
+      }),
+    );
+
+    await waitFor(() => {
+      expect(
+        within(tagEditorSection as HTMLElement).getByText('Projeto VIP'),
+      ).toBeInTheDocument();
+    });
+
+    const updatedTagCard = within(tagEditorSection as HTMLElement)
+      .getByText('Projeto VIP')
+      .closest('.entity-card');
+
+    expect(updatedTagCard).not.toBeNull();
+
+    fireEvent.click(
+      within(updatedTagCard as HTMLElement).getByRole('button', { name: 'Remover' }),
+    );
+
+    await waitFor(() => {
+      expect(
+        within(tagEditorSection as HTMLElement).queryByText('Projeto VIP'),
+      ).not.toBeInTheDocument();
+    });
+
+    fireEvent.change(within(filterSection as HTMLElement).getByLabelText('Tag'), {
+      target: { value: '22222222-2222-4222-8222-222222222222' },
+    });
+    fireEvent.click(
+      within(filterSection as HTMLElement).getByRole('button', { name: 'Aplicar filtros' }),
+    );
+
+    await waitFor(() => {
+      expect(
+        within(recordsSection as HTMLElement).getByText('Salario maio'),
+      ).toBeInTheDocument();
+      expect(
+        within(recordsSection as HTMLElement).getByText('Hotel cliente'),
+      ).toBeInTheDocument();
+      expect(
+        within(recordsSection as HTMLElement).queryByText('Aluguel maio'),
+      ).not.toBeInTheDocument();
+    });
+
+    expect(
+      within(byEntitySection as HTMLElement).getByText('Visa Corporativo'),
+    ).toBeInTheDocument();
+  });
+
   it('executa o fluxo financeiro principal na shell web', async () => {
     window.history.pushState({}, '', '/app/contas');
 
@@ -1859,43 +2278,57 @@ describe('App', () => {
       ).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByPlaceholderText('Ex.: salario'), {
+    const transactionsFormSection = screen
+      .getByRole('heading', { name: 'Novo lancamento' })
+      .closest('article');
+
+    expect(transactionsFormSection).not.toBeNull();
+
+    fireEvent.change(within(transactionsFormSection as HTMLElement).getByPlaceholderText('Ex.: salario'), {
       target: { value: 'Recebimento salarial' },
     });
-    fireEvent.change(screen.getByPlaceholderText('Ex.: trabalho'), {
+    fireEvent.change(within(transactionsFormSection as HTMLElement).getByLabelText('Categoria'), {
       target: { value: 'Trabalho' },
     });
-    fireEvent.change(screen.getByLabelText('Valor em centavos'), {
+    fireEvent.change(within(transactionsFormSection as HTMLElement).getByLabelText('Valor em centavos'), {
       target: { value: '200000' },
     });
-    fireEvent.change(screen.getByLabelText('Data'), {
+    fireEvent.change(within(transactionsFormSection as HTMLElement).getByLabelText('Data'), {
       target: { value: '2026-05-05' },
     });
-    fireEvent.change(screen.getByLabelText('Tipo'), {
+    fireEvent.change(within(transactionsFormSection as HTMLElement).getByLabelText('Tipo'), {
       target: { value: 'income' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Criar lancamento' }));
+    fireEvent.click(
+      within(transactionsFormSection as HTMLElement).getByRole('button', {
+        name: 'Criar lancamento',
+      }),
+    );
 
     await waitFor(() => {
       expect(screen.getByText('Recebimento salarial')).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText('Descricao'), {
+    fireEvent.change(within(transactionsFormSection as HTMLElement).getByLabelText('Descricao'), {
       target: { value: 'Pagamento do aluguel' },
     });
-    fireEvent.change(screen.getByLabelText('Categoria'), {
+    fireEvent.change(within(transactionsFormSection as HTMLElement).getByLabelText('Categoria'), {
       target: { value: 'Casa' },
     });
-    fireEvent.change(screen.getByLabelText('Valor em centavos'), {
+    fireEvent.change(within(transactionsFormSection as HTMLElement).getByLabelText('Valor em centavos'), {
       target: { value: '50000' },
     });
-    fireEvent.change(screen.getByLabelText('Tipo'), {
+    fireEvent.change(within(transactionsFormSection as HTMLElement).getByLabelText('Tipo'), {
       target: { value: 'expense' },
     });
-    fireEvent.change(screen.getByLabelText('Data'), {
+    fireEvent.change(within(transactionsFormSection as HTMLElement).getByLabelText('Data'), {
       target: { value: '2026-05-06' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Criar lancamento' }));
+    fireEvent.click(
+      within(transactionsFormSection as HTMLElement).getByRole('button', {
+        name: 'Criar lancamento',
+      }),
+    );
 
     await waitFor(() => {
       expect(screen.getByText('Pagamento do aluguel')).toBeInTheDocument();
@@ -2084,19 +2517,29 @@ describe('App', () => {
       ).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByPlaceholderText('Ex.: notebook'), {
+    const purchaseFormSection = screen
+      .getByRole('heading', { name: 'Nova compra no credito' })
+      .closest('article');
+
+    expect(purchaseFormSection).not.toBeNull();
+
+    fireEvent.change(within(purchaseFormSection as HTMLElement).getByPlaceholderText('Ex.: notebook'), {
       target: { value: 'Notebook trabalho' },
     });
-    fireEvent.change(screen.getByPlaceholderText('Ex.: tecnologia'), {
+    fireEvent.change(within(purchaseFormSection as HTMLElement).getByLabelText('Categoria'), {
       target: { value: 'Tecnologia' },
     });
-    fireEvent.change(screen.getByLabelText('Valor em centavos'), {
+    fireEvent.change(within(purchaseFormSection as HTMLElement).getByLabelText('Valor em centavos'), {
       target: { value: '50000' },
     });
-    fireEvent.change(screen.getByLabelText('Data da compra'), {
+    fireEvent.change(within(purchaseFormSection as HTMLElement).getByLabelText('Data da compra'), {
       target: { value: '2026-05-20' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Criar compra' }));
+    fireEvent.click(
+      within(purchaseFormSection as HTMLElement).getByRole('button', {
+        name: 'Criar compra',
+      }),
+    );
 
     const purchasesSection = screen
       .getByRole('heading', { name: 'Compras no credito' })
@@ -2111,13 +2554,17 @@ describe('App', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Editar compra' }));
-    fireEvent.change(screen.getByPlaceholderText('Ex.: notebook'), {
+    fireEvent.change(within(purchaseFormSection as HTMLElement).getByPlaceholderText('Ex.: notebook'), {
       target: { value: 'Notebook trabalho ajustado' },
     });
-    fireEvent.change(screen.getByLabelText('Valor em centavos'), {
+    fireEvent.change(within(purchaseFormSection as HTMLElement).getByLabelText('Valor em centavos'), {
       target: { value: '60000' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Atualizar compra' }));
+    fireEvent.click(
+      within(purchaseFormSection as HTMLElement).getByRole('button', {
+        name: 'Atualizar compra',
+      }),
+    );
 
     await waitFor(() => {
       expect(
@@ -2127,19 +2574,23 @@ describe('App', () => {
       ).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByPlaceholderText('Ex.: notebook'), {
+    fireEvent.change(within(purchaseFormSection as HTMLElement).getByPlaceholderText('Ex.: notebook'), {
       target: { value: 'Passagem executiva' },
     });
-    fireEvent.change(screen.getByPlaceholderText('Ex.: tecnologia'), {
+    fireEvent.change(within(purchaseFormSection as HTMLElement).getByLabelText('Categoria'), {
       target: { value: 'Viagem' },
     });
-    fireEvent.change(screen.getByLabelText('Valor em centavos'), {
+    fireEvent.change(within(purchaseFormSection as HTMLElement).getByLabelText('Valor em centavos'), {
       target: { value: '25000' },
     });
-    fireEvent.change(screen.getByLabelText('Data da compra'), {
+    fireEvent.change(within(purchaseFormSection as HTMLElement).getByLabelText('Data da compra'), {
       target: { value: '2026-05-26' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Criar compra' }));
+    fireEvent.click(
+      within(purchaseFormSection as HTMLElement).getByRole('button', {
+        name: 'Criar compra',
+      }),
+    );
 
     const projectedInvoicesSection = screen
       .getByRole('heading', { name: 'Proximos vencimentos' })

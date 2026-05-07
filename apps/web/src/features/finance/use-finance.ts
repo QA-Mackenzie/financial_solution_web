@@ -8,8 +8,10 @@ import type {
   CreateContractInput,
   CreateInstallmentPlanInput,
   CreateProvisionInput,
+  CreateTagInput,
   CreateTransactionInput,
   EndContractInput,
+  FinancialRecordFilter,
   RedeemProvisionInput,
   RemoveVariableExpenseOverrideInput,
   UpdateHorizonSettingsInput,
@@ -19,6 +21,7 @@ import type {
   UpdateCreditCardPurchaseInput,
   UpdateInstallmentPlanInput,
   UpdateProvisionInput,
+  UpdateTagInput,
   UpdateTransactionInput,
   VariableExpenseOverride,
 } from '@shf/contracts';
@@ -30,7 +33,10 @@ export const creditCardsSnapshotQueryKey = ['finance', 'credit-cards', 'snapshot
 export const contractsSnapshotQueryKey = ['finance', 'contracts', 'snapshot'];
 export const horizonSnapshotQueryKey = ['finance', 'horizon', 'snapshot'];
 export const installmentsSnapshotQueryKey = ['finance', 'installments', 'snapshot'];
+export const financialAnalyticsQueryKey = ['finance', 'analytics'];
+export const financialRecordsQueryKey = ['finance', 'records'];
 export const provisionsSnapshotQueryKey = ['finance', 'provisions', 'snapshot'];
+export const tagsSnapshotQueryKey = ['finance', 'tags', 'snapshot'];
 export const transactionsSnapshotQueryKey = ['finance', 'transactions', 'snapshot'];
 export const variableExpenseSnapshotQueryKey = [
   'finance',
@@ -43,9 +49,12 @@ async function invalidateFinancialQueries(queryClient: ReturnType<typeof useQuer
     queryClient.invalidateQueries({ queryKey: accountsSnapshotQueryKey }),
     queryClient.invalidateQueries({ queryKey: creditCardsSnapshotQueryKey }),
     queryClient.invalidateQueries({ queryKey: contractsSnapshotQueryKey }),
+    queryClient.invalidateQueries({ queryKey: financialAnalyticsQueryKey }),
+    queryClient.invalidateQueries({ queryKey: financialRecordsQueryKey }),
     queryClient.invalidateQueries({ queryKey: horizonSnapshotQueryKey }),
     queryClient.invalidateQueries({ queryKey: installmentsSnapshotQueryKey }),
     queryClient.invalidateQueries({ queryKey: provisionsSnapshotQueryKey }),
+    queryClient.invalidateQueries({ queryKey: tagsSnapshotQueryKey }),
     queryClient.invalidateQueries({ queryKey: transactionsSnapshotQueryKey }),
     queryClient.invalidateQueries({ queryKey: variableExpenseSnapshotQueryKey }),
   ]);
@@ -62,6 +71,27 @@ export function useTransactionsSnapshotQuery() {
   return useQuery({
     queryFn: financeApi.getTransactionsSnapshot,
     queryKey: transactionsSnapshotQueryKey,
+  });
+}
+
+export function useTagsSnapshotQuery() {
+  return useQuery({
+    queryFn: financeApi.getTagsSnapshot,
+    queryKey: tagsSnapshotQueryKey,
+  });
+}
+
+export function useFinancialRecordsQuery(filters: FinancialRecordFilter) {
+  return useQuery({
+    queryFn: () => financeApi.getFinancialRecords(filters),
+    queryKey: [...financialRecordsQueryKey, filters],
+  });
+}
+
+export function useFinancialAnalyticsQuery(filters: FinancialRecordFilter) {
+  return useQuery({
+    queryFn: () => financeApi.getFinancialAnalytics(filters),
+    queryKey: [...financialAnalyticsQueryKey, filters],
   });
 }
 
@@ -139,6 +169,15 @@ export function useCreateTransactionMutation() {
 
   return useMutation({
     mutationFn: (input: CreateTransactionInput) => financeApi.createTransaction(input),
+    onSuccess: async () => invalidateFinancialQueries(queryClient),
+  });
+}
+
+export function useCreateTagMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: CreateTagInput) => financeApi.createTag(input),
     onSuccess: async () => invalidateFinancialQueries(queryClient),
   });
 }
@@ -227,11 +266,29 @@ export function useUpdateTransactionMutation() {
   });
 }
 
+export function useUpdateTagMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: UpdateTagInput) => financeApi.updateTag(input),
+    onSuccess: async () => invalidateFinancialQueries(queryClient),
+  });
+}
+
 export function useDeleteTransactionMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (id: string) => financeApi.deleteTransaction(id),
+    onSuccess: async () => invalidateFinancialQueries(queryClient),
+  });
+}
+
+export function useDeleteTagMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => financeApi.deleteTag(id),
     onSuccess: async () => invalidateFinancialQueries(queryClient),
   });
 }

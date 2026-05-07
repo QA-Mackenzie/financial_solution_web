@@ -1,5 +1,6 @@
 export * from './auth';
 export * from './account';
+export * from './analytics';
 export * from './category';
 export * from './contract';
 export * from './creditCard';

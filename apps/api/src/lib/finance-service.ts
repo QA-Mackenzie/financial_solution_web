@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import {
+  DEFAULT_UNCATEGORIZED_CATEGORY,
   DEFAULT_HORIZON_SAFETY_MARGIN_IN_CENTS,
   DEFAULT_VARIABLE_EXPENSE_WINDOW_IN_MONTHS,
 } from '@shf/contracts';
@@ -23,8 +24,13 @@ import type {
   CreateContractInput,
   CreateInstallmentPlanInput,
   CreateProvisionInput,
+  CreateTagInput,
   CreateTransactionInput,
   EndContractInput,
+  FinancialAnalyticsSnapshot,
+  FinancialRecordFilter,
+  FinancialRecordListItem,
+  FinancialRecordQuerySnapshot,
   HorizonSettings,
   HorizonSnapshot,
   InstallmentOperation,
@@ -35,6 +41,9 @@ import type {
   ProvisionListItem,
   RedeemProvisionInput,
   RemoveVariableExpenseOverrideInput,
+  TagListItem,
+  TagsSnapshot,
+  TransactionListItem,
   TransactionsSnapshot,
   UpdateInstallmentAnticipationInput,
   UpdateInstallmentPlanInput,
@@ -44,6 +53,7 @@ import type {
   UpdateContractInput,
   UpdateHorizonSettingsInput,
   UpdateAccountInput,
+  UpdateTagInput,
   UpdateTransactionInput,
   VariableExpenseOverride,
   VariableExpenseOverrideListItem,
@@ -53,6 +63,8 @@ import {
   buildAccountsSnapshot,
   buildCombinedCreditCardFinancials,
   buildContractsSnapshot,
+  buildFinancialAnalyticsSnapshot,
+  buildFinancialRecordQuerySnapshot,
   buildProjectedProvisionOccurrences,
   buildProjectedVariableExpenseOccurrences,
   buildTransactionsSnapshot,
@@ -63,6 +75,7 @@ import {
   sanitizeInstallmentAnticipationInput,
   sanitizeInstallmentPlanInput,
   sanitizeProvisionInput,
+  sanitizeTagInput,
   sanitizeTransactionInput,
   validateAccountInput,
   validateCreditCardInput,
@@ -72,6 +85,7 @@ import {
   validateInstallmentPlanInput,
   validateProvisionInput,
   validateProvisionRedeemInput,
+  validateTagInput,
   validateTransactionInput,
 } from '@shf/domain-core';
 
@@ -109,6 +123,9 @@ type FinancialAuditAction =
   | 'PROVISION_CREATED'
   | 'PROVISION_REDEEMED'
   | 'PROVISION_UPDATED'
+  | 'TAG_CREATED'
+  | 'TAG_DELETED'
+  | 'TAG_UPDATED'
   | 'TRANSACTION_CREATED'
   | 'TRANSACTION_DELETED'
   | 'TRANSACTION_UPDATED'
@@ -125,6 +142,7 @@ type FinancialAuditResourceType =
   | 'manual_transaction'
   | 'provision'
   | 'recurring_contract'
+  | 'tag'
   | 'variable_expense_override';
 
 type HorizonCacheEntry = {
@@ -257,6 +275,81 @@ function toVariableExpenseOverride(
   };
 }
 
+function buildTagLookup(tags: TagListItem[]) {
+  return tags.reduce<Map<string, { id: string; name: string }>>((map, tag) => {
+    map.set(tag.id, {
+      id: tag.id,
+      name: tag.name,
+    });
+
+    return map;
+  }, new Map());
+}
+
+function mapRecordTags(
+  tagIds: readonly string[] | undefined,
+  tagLookup: Map<string, { id: string; name: string }>,
+) {
+  return (tagIds ?? []).reduce<Array<{ id: string; name: string }>>((tags, tagId) => {
+    const tag = tagLookup.get(tagId);
+
+    if (tag) {
+      tags.push(tag);
+    }
+
+    return tags;
+  }, []);
+}
+
+function mapTransactionToFinancialRecord(
+  transaction: TransactionListItem,
+  tagLookup: Map<string, { id: string; name: string }>,
+): FinancialRecordListItem {
+  return {
+    accountId: transaction.accountId,
+    accountName: transaction.accountName,
+    amountInCents: transaction.amountInCents,
+    category: transaction.category ?? DEFAULT_UNCATEGORIZED_CATEGORY,
+    createdAt: transaction.createdAt,
+    description: transaction.description,
+    entityId: transaction.accountId,
+    entityKind: 'account',
+    entityName: transaction.accountName,
+    id: transaction.id,
+    occurrenceDate: transaction.transactionDate,
+    recordKind: 'manualTransaction',
+    signedAmountInCents: transaction.signedAmountInCents,
+    tags: mapRecordTags(transaction.tagIds, tagLookup),
+    type: transaction.type,
+    updatedAt: transaction.updatedAt,
+  };
+}
+
+function mapCreditCardPurchaseToFinancialRecord(
+  purchase: CreditCardPurchaseListItem,
+  tagLookup: Map<string, { id: string; name: string }>,
+  creditCardName: string,
+): FinancialRecordListItem {
+  return {
+    accountId: purchase.paymentAccountId,
+    accountName: purchase.paymentAccountName,
+    amountInCents: purchase.amountInCents,
+    category: purchase.category ?? DEFAULT_UNCATEGORIZED_CATEGORY,
+    createdAt: purchase.createdAt,
+    description: purchase.description,
+    entityId: purchase.creditCardId,
+    entityKind: 'creditCard',
+    entityName: creditCardName,
+    id: purchase.id,
+    occurrenceDate: purchase.purchaseDate,
+    recordKind: 'creditCardPurchase',
+    signedAmountInCents: -purchase.amountInCents,
+    tags: mapRecordTags(purchase.tagIds, tagLookup),
+    type: 'expense',
+    updatedAt: purchase.updatedAt,
+  };
+}
+
 export class FinanceService {
   private readonly dataAccess: FinancialDataAccess;
   private readonly horizonCache = new Map<string, HorizonCacheEntry>();
@@ -381,6 +474,135 @@ export class FinanceService {
         },
       ),
     };
+  }
+
+  async getTagsSnapshot(userId: string): Promise<TagsSnapshot> {
+    return this.dataAccess.tags.getSnapshot(userId);
+  }
+
+  async listFinancialRecords(
+    userId: string,
+    filters: FinancialRecordFilter = {},
+  ): Promise<FinancialRecordQuerySnapshot> {
+    const records = await this.buildFinancialRecordsForUser(userId);
+
+    return buildFinancialRecordQuerySnapshot(records, filters);
+  }
+
+  async getFinancialAnalytics(
+    userId: string,
+    filters: FinancialRecordFilter = {},
+  ): Promise<FinancialAnalyticsSnapshot> {
+    const records = await this.buildFinancialRecordsForUser(userId);
+
+    return buildFinancialAnalyticsSnapshot(records, filters);
+  }
+
+  async createTag(
+    userId: string,
+    input: CreateTagInput,
+    context: FinanceRequestContext,
+  ): Promise<TagListItem> {
+    const sanitizedInput = sanitizeTagInput(input);
+    const issues = validateTagInput(sanitizedInput);
+
+    if (issues.length > 0) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', issues);
+    }
+
+    const tag = await this.database.runInTransaction(async (transaction) => {
+      const createdTag = await this.dataAccess.tags.create(
+        userId,
+        sanitizedInput,
+        this.now(),
+        transaction,
+      );
+      const tag = await this.dataAccess.tags.findListItemById(
+        userId,
+        createdTag.id,
+        transaction,
+      );
+
+      if (!tag) {
+        throw new AppError(500, 'FINANCE_TAG_CREATE_FAILED', 'Falha ao criar tag.');
+      }
+
+      await this.insertAuditEvent(
+        transaction,
+        userId,
+        'tag',
+        tag.id,
+        'TAG_CREATED',
+        context,
+        {
+          name: tag.name,
+        },
+      );
+
+      return tag;
+    });
+
+    return tag;
+  }
+
+  async updateTag(
+    userId: string,
+    input: UpdateTagInput,
+    context: FinanceRequestContext,
+  ): Promise<TagListItem> {
+    const sanitizedInput = sanitizeTagInput(input);
+    const issues = validateTagInput(sanitizedInput);
+
+    if (issues.length > 0) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', issues);
+    }
+
+    return this.database.runInTransaction(async (transaction) => {
+      const tag = await this.dataAccess.tags.update(
+        userId,
+        sanitizedInput,
+        this.now(),
+        transaction,
+      );
+
+      await this.insertAuditEvent(
+        transaction,
+        userId,
+        'tag',
+        tag.id,
+        'TAG_UPDATED',
+        context,
+        {
+          name: tag.name,
+        },
+      );
+
+      return tag;
+    });
+  }
+
+  async deleteTag(
+    userId: string,
+    tagId: string,
+    context: FinanceRequestContext,
+  ): Promise<TagListItem> {
+    return this.database.runInTransaction(async (transaction) => {
+      const tag = await this.dataAccess.tags.delete(userId, tagId, transaction);
+
+      await this.insertAuditEvent(
+        transaction,
+        userId,
+        'tag',
+        tag.id,
+        'TAG_DELETED',
+        context,
+        {
+          name: tag.name,
+        },
+      );
+
+      return tag;
+    });
   }
 
   async createAccount(
@@ -1465,6 +1687,37 @@ export class FinanceService {
     });
 
     this.invalidateHorizonCache(userId);
+  }
+
+  private async buildFinancialRecordsForUser(
+    userId: string,
+  ): Promise<FinancialRecordListItem[]> {
+    const currentDate = this.now().toISOString().slice(0, 10);
+    const [cards, purchases, tags, transactions] = await Promise.all([
+      this.dataAccess.creditCards.listByUserId(userId, currentDate),
+      this.dataAccess.creditCards.listPurchasesByUserId(userId),
+      this.dataAccess.tags.listByUserId(userId),
+      this.dataAccess.manualTransactions.listByUserId(userId),
+    ]);
+    const creditCardNameById = cards.reduce<Map<string, string>>((map, card) => {
+      map.set(card.id, card.name);
+
+      return map;
+    }, new Map());
+    const tagLookup = buildTagLookup(tags);
+
+    return [
+      ...transactions.map((transaction) =>
+        mapTransactionToFinancialRecord(transaction, tagLookup),
+      ),
+      ...purchases.map((purchase) =>
+        mapCreditCardPurchaseToFinancialRecord(
+          purchase,
+          tagLookup,
+          creditCardNameById.get(purchase.creditCardId) ?? purchase.creditCardName,
+        ),
+      ),
+    ];
   }
 
   private async getOrCreateUserSettings(userId: string) {

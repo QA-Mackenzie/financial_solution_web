@@ -37,6 +37,7 @@ import type {
   RemoveVariableExpenseOverrideInput,
   Tag,
   TagListItem,
+  TagsSnapshot,
   UpdateInstallmentAnticipationInput,
   UpdateInstallmentPlanInput,
   UpdateProvisionInput,
@@ -44,6 +45,7 @@ import type {
   UpdateCreditCardPurchaseInput,
   UpdateContractInput,
   UpdateAccountInput,
+  UpdateTagInput,
   UpdateTransactionInput,
   TransactionListItem,
   VariableExpenseOverride,
@@ -1135,6 +1137,31 @@ function buildVariableExpenseOverridesSelect(whereClause: string) {
            and a.id = veo.account_id
           ${whereClause}`;
 }
+
+  function buildTagsSelect(whereClause: string) {
+    return `select t.id,
+                   t.user_id,
+                   t.name,
+                   t.created_at,
+                   t.updated_at,
+                   (
+                     count(distinct mtt.manual_transaction_id)
+                     + count(distinct rct.recurring_contract_id)
+                     + count(distinct ccpt.credit_card_purchase_id)
+                   )::text as usage_count
+            from finance.tags t
+            left join finance.manual_transaction_tags mtt
+              on mtt.user_id = t.user_id
+             and mtt.tag_id = t.id
+            left join finance.recurring_contract_tags rct
+              on rct.user_id = t.user_id
+             and rct.tag_id = t.id
+            left join finance.credit_card_purchase_tags ccpt
+              on ccpt.user_id = t.user_id
+             and ccpt.tag_id = t.id
+            ${whereClause}
+            group by t.id, t.user_id, t.name, t.created_at, t.updated_at`;
+  }
 
 export class UserSettingsRepository {
   constructor(private readonly database: DatabaseClient) {}
@@ -2889,10 +2916,15 @@ export class CreditCardsRepository {
 export class TagsRepository {
   constructor(private readonly database: DatabaseClient) {}
 
-  async create(userId: string, input: CreateTagInput, now = new Date()): Promise<Tag> {
+  async create(
+    userId: string,
+    input: CreateTagInput,
+    now = new Date(),
+    database: DatabaseExecutor = this.database,
+  ): Promise<Tag> {
     const sanitizedInput = sanitizeTagInput(input);
     const normalizedName = normalizeName(sanitizedInput.name);
-    const existing = await this.database.query<{ id: string }>(
+    const existing = await database.query<{ id: string }>(
       'select id from finance.tags where user_id = $1 and normalized_name = $2',
       [userId, normalizedName],
     );
@@ -2906,7 +2938,7 @@ export class TagsRepository {
     }
 
     const nowIsoString = now.toISOString();
-    const result = await this.database.query<TagRow>(
+    const result = await database.query<TagRow>(
       `insert into finance.tags (
          id,
          user_id,
@@ -2929,8 +2961,12 @@ export class TagsRepository {
     return mapTag(result.rows[0]);
   }
 
-  async findById(userId: string, tagId: string): Promise<Tag | null> {
-    const result = await this.database.query<TagRow>(
+  async findById(
+    userId: string,
+    tagId: string,
+    database: DatabaseExecutor = this.database,
+  ): Promise<Tag | null> {
+    const result = await database.query<TagRow>(
       `select id, user_id, name, created_at, updated_at
          from finance.tags
         where user_id = $1 and id = $2`,
@@ -2940,35 +2976,107 @@ export class TagsRepository {
     return result.rows[0] ? mapTag(result.rows[0]) : null;
   }
 
+  async findListItemById(
+    userId: string,
+    tagId: string,
+    database: DatabaseExecutor = this.database,
+  ): Promise<TagListItem | null> {
+    const result = await database.query<TagRow>(
+      `${buildTagsSelect('where t.user_id = $1 and t.id = $2')}`,
+      [userId, tagId],
+    );
+
+    return result.rows[0] ? mapTagListItem(result.rows[0]) : null;
+  }
+
+  async update(
+    userId: string,
+    input: UpdateTagInput,
+    now = new Date(),
+    database: DatabaseExecutor = this.database,
+  ): Promise<TagListItem> {
+    const sanitizedInput = sanitizeTagInput(input);
+    const normalizedName = normalizeName(sanitizedInput.name);
+    const existing = await this.findById(userId, sanitizedInput.id, database);
+
+    if (!existing) {
+      throw new AppError(
+        404,
+        'FINANCE_TAG_NOT_FOUND',
+        'Tag nao encontrada para o usuario autenticado.',
+      );
+    }
+
+    const duplicate = await database.query<{ id: string }>(
+      'select id from finance.tags where user_id = $1 and normalized_name = $2 and id <> $3',
+      [userId, normalizedName, sanitizedInput.id],
+    );
+
+    if ((duplicate.rowCount ?? 0) > 0) {
+      throw new AppError(
+        409,
+        'FINANCE_DUPLICATE_TAG',
+        'Ja existe uma tag com este nome para o usuario autenticado.',
+      );
+    }
+
+    await database.query(
+      `update finance.tags
+          set name = $3,
+              normalized_name = $4,
+              updated_at = $5
+        where user_id = $1 and id = $2`,
+      [userId, sanitizedInput.id, sanitizedInput.name, normalizedName, now.toISOString()],
+    );
+
+    return (await this.findListItemById(userId, sanitizedInput.id, database))!;
+  }
+
+  async delete(
+    userId: string,
+    tagId: string,
+    database: DatabaseExecutor = this.database,
+  ): Promise<TagListItem> {
+    const existing = await this.findListItemById(userId, tagId, database);
+
+    if (!existing) {
+      throw new AppError(
+        404,
+        'FINANCE_TAG_NOT_FOUND',
+        'Tag nao encontrada para o usuario autenticado.',
+      );
+    }
+
+    if (existing.usageCount > 0) {
+      throw new AppError(
+        409,
+        'FINANCE_TAG_IN_USE',
+        'A tag ainda esta associada a itens financeiros e nao pode ser removida.',
+      );
+    }
+
+    await database.query(
+      'delete from finance.tags where user_id = $1 and id = $2',
+      [userId, tagId],
+    );
+
+    return existing;
+  }
+
   async listByUserId(userId: string): Promise<TagListItem[]> {
     const result = await this.database.query<TagRow>(
-      `select t.id,
-              t.user_id,
-              t.name,
-              t.created_at,
-              t.updated_at,
-              (
-                count(distinct mtt.manual_transaction_id)
-                + count(distinct rct.recurring_contract_id)
-                + count(distinct ccpt.credit_card_purchase_id)
-              )::text as usage_count
-         from finance.tags t
-         left join finance.manual_transaction_tags mtt
-           on mtt.user_id = t.user_id
-          and mtt.tag_id = t.id
-         left join finance.recurring_contract_tags rct
-           on rct.user_id = t.user_id
-          and rct.tag_id = t.id
-         left join finance.credit_card_purchase_tags ccpt
-           on ccpt.user_id = t.user_id
-          and ccpt.tag_id = t.id
-        where t.user_id = $1
-        group by t.id, t.user_id, t.name, t.created_at, t.updated_at
-        order by t.name asc`,
+      `${buildTagsSelect('where t.user_id = $1')}
+       order by t.name asc`,
       [userId],
     );
 
     return result.rows.map(mapTagListItem);
+  }
+
+  async getSnapshot(userId: string): Promise<TagsSnapshot> {
+    return {
+      tags: await this.listByUserId(userId),
+    };
   }
 }
 

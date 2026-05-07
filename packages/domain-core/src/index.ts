@@ -1,5 +1,6 @@
 export const supportedFinancialModules = [
   'accounts',
+  'analytics',
   'transactions',
   'horizon',
   'contracts',
@@ -16,6 +17,7 @@ export function normalizeEmail(email: string): string {
 }
 
 export * from './accounts/accountInput';
+export * from './analytics/analyticsSnapshot';
 export * from './accounts/accountSnapshot';
 export * from './contracts/contractInput';
 export * from './contracts/contractProjection';
