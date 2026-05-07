@@ -502,6 +502,8 @@ O sistema web representa credito sem distorcer o caixa atual e sem perder equiva
 
 ## Sprint 7 - Parcelamentos e antecipacao
 
+Status: concluida em 2026-05-07
+
 ### Objetivo
 
 Entregar o fluxo que mais exige recalculo confiavel do futuro: parcelamentos e quitacao antecipada.
@@ -514,20 +516,57 @@ Entregar o fluxo que mais exige recalculo confiavel do futuro: parcelamentos e q
 
 ### Backlog recomendado
 
-- [ ] Implementar schema e endpoints de installment_plans e installment_operations
-- [ ] Portar installmentInput, installmentSchedule e installmentCardProjection
-- [ ] Permitir parcelamento vinculado a cartao quando aplicavel
-- [ ] Implementar antecipacao parcial ou total das parcelas restantes
-- [ ] Integrar parcelamentos ao horizonte oficial e ao modulo de cartoes
-- [ ] Criar UI para criar parcelamento, visualizar cronograma e antecipar parcelas
-- [ ] Criar testes de regressao para cronograma, soma total e quitacao antecipada
-- [ ] Criar E2E especifico para parcelamento e recalculo do horizonte
-- [ ] Revisar idempotencia e consistencia transacional das operacoes de antecipacao
-- [ ] Garantir rastreabilidade em auditoria das alteracoes futuras geradas por antecipacao
+- [x] Implementar schema e endpoints de installment_plans e installment_operations
+- [x] Portar installmentInput, installmentSchedule e installmentCardProjection
+- [x] Permitir parcelamento vinculado a cartao quando aplicavel
+- [x] Implementar antecipacao parcial ou total das parcelas restantes
+- [x] Integrar parcelamentos ao horizonte oficial e ao modulo de cartoes
+- [x] Criar UI para criar parcelamento, visualizar cronograma e antecipar parcelas
+- [x] Criar testes de regressao para cronograma, soma total e quitacao antecipada
+- [x] Criar E2E especifico para parcelamento e recalculo do horizonte
+- [x] Revisar idempotencia e consistencia transacional das operacoes de antecipacao
+- [x] Garantir rastreabilidade em auditoria das alteracoes futuras geradas por antecipacao
 
 ### Gate de saida
 
 Parcelamentos passam a ser uma feature confiavel na web, com recalculo transparente e matematicamente consistente do futuro.
+
+### Implementado nesta sprint
+
+- contracts compartilhados expandidos com schemas Zod, tipos e payloads para installment_plans, installment_operations, ocorrencias projetadas e snapshots de parcelamentos
+- dominio puro reutilizado em packages/domain-core para validacao de parcelamentos, cronograma mensal, antecipacao parcial via affectedInstallmentCount e projecao de compras parceladas em cartao
+- InstallmentsRepository owner-scoped implementado com create, update, antecipacao, atualizacao de antecipacao, snapshot consolidado, bloqueio cross-user e calculo derivado do affectedAmountInCents a partir das parcelas elegiveis
+- FinanceService, horizonte oficial e rotas financeiras da API atualizados para expor parcelamentos, recalcular o horizonte com ocorrencias de conta e fundir parcelas no modulo de cartoes como compras/faturas projetadas
+- eventos de auditoria adicionados para criacao e alteracao de parcelamentos e para antecipacoes, mantendo rastreabilidade das alteracoes futuras geradas pelo recalculo
+- cliente web atualizado com endpoints e hooks React Query de parcelamentos, nova pagina protegida de parcelamentos, edicao de plano, visualizacao de cronograma, historico de antecipacoes e impacto em cartao quando aplicavel
+- pagina de cartoes ajustada para tratar compras projetadas oriundas de parcelamentos como itens derivados, sem fluxo de edicao manual
+- cobertura automatizada ampliada com testes de dominio para antecipacao parcial, testes HTTP da API para conta e cartao, regressao unitária do horizonte oficial e fluxo de shell web cobrindo parcelamento, antecipacao e reflexo no modulo de cartoes
+
+### Parcelamentos no horizonte oficial
+
+- parcelamentos em conta passam a gerar ocorrencias futuras oficiais no horizonte a partir do mes corrente, respeitando antecipacoes e recalculando o saldo projetado imediatamente
+- parcelamentos vinculados a cartao geram compras projetadas que entram no billing do cartao e so impactam o caixa no vencimento correto da fatura
+- a antecipacao parcial seleciona as N proximas parcelas elegiveis em ordem cronologica, evitando o comportamento antigo de antecipar automaticamente todo o saldo remanescente
+
+### Consistencia e auditoria
+
+- operacoes de antecipacao foram implementadas dentro de transacao, com reavaliacao do cronograma vigente e exclusao da propria operacao em cenarios de update para manter consistencia local
+- o valor total antecipado nao e confiado ao payload do cliente; ele e recalculado no backend a partir das parcelas efetivamente afetadas
+- snapshots combinados de cartao agora aceitam ids sinteticos para compras projetadas de parcelamentos, preservando a separacao entre compras persistidas e compras derivadas
+
+### Validacao executada
+
+- npm run lint
+- npm run typecheck
+- npm run test
+- npx -y node@20 C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js run build
+- npm run infra:up
+- npm run db:check
+
+### Observacoes de ambiente
+
+- o build completo do monorepo foi validado com Node 20 sobre o npm global da maquina porque o frontend usa Vite 7 e o Node global 18.20.8 continua abaixo do requisito minimo
+- Docker Desktop e Postgres local estavam disponiveis nesta validacao; npm run infra:up subiu o container shf-web-postgres e npm run db:check retornou status up
 
 ---
 

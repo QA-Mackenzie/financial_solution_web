@@ -12,6 +12,7 @@ import { ContractsPage } from './features/contracts/ContractsPage';
 import { CreditCardsPage } from './features/creditCards/CreditCardsPage';
 import { AccessPage } from './features/dashboard/AccessPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
+import { InstallmentsPage } from './features/installments/InstallmentsPage';
 import { TransactionsPage } from './features/transactions/TransactionsPage';
 import { queryClient } from './lib/query-client';
 
@@ -106,6 +107,16 @@ export function App() {
               </ProtectedRoute>
             }
             path="/app/cartoes"
+          />
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <InstallmentsPage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+            path="/app/parcelamentos"
           />
           <Route
             element={

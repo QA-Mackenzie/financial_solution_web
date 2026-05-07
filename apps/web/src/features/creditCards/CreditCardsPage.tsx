@@ -169,6 +169,10 @@ export function CreditCardsPage() {
   }
 
   function startEditingPurchase(purchase: CreditCardPurchaseListItem) {
+    if (purchase.isProjected) {
+      return;
+    }
+
     setEditingPurchase(purchase);
     resetPurchase({
       amountInCents: purchase.amountInCents,
@@ -567,13 +571,17 @@ export function CreditCardsPage() {
                         {formatMonthYear(`${purchase.invoiceMonth}-01`)}
                       </small>
                     </div>
-                    <button
-                      className="ghost-button"
-                      onClick={() => startEditingPurchase(purchase)}
-                      type="button"
-                    >
-                      Editar compra
-                    </button>
+                    {purchase.isProjected ? (
+                      <span>Gerada por parcelamento</span>
+                    ) : (
+                      <button
+                        className="ghost-button"
+                        onClick={() => startEditingPurchase(purchase)}
+                        type="button"
+                      >
+                        Editar compra
+                      </button>
+                    )}
                   </div>
 
                   <div className="stats-grid stats-grid-inline">
@@ -589,7 +597,12 @@ export function CreditCardsPage() {
                     </div>
                     <div className="stat-item">
                       <span>Categoria</span>
-                      <strong>{purchase.category ?? 'Sem categoria'}</strong>
+                      <strong>
+                        {purchase.category ??
+                          (purchase.isProjected
+                            ? 'Parcelamento projetado'
+                            : 'Sem categoria')}
+                      </strong>
                     </div>
                   </div>
                 </div>

@@ -34,7 +34,7 @@ export const creditCardSchema = z.object({
 });
 
 export const creditCardPurchaseSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().min(1),
   creditCardId: z.string().uuid(),
   description: z.string().min(1).max(120),
   category: z.string().min(1).max(80).optional(),

@@ -105,26 +105,13 @@ export const buildInstallmentOccurrenceListItems = (
             left.id.localeCompare(right.id),
         );
 
-      return amounts.map((amountInCents, index) => {
+      const occurrences: InstallmentOccurrenceListItem[] = amounts.map(
+        (amountInCents, index) => {
         const installmentNumber = index + 1;
         const originalOccurrenceDate = shiftMonth(
           plan.firstOccurrenceDate,
           index,
         );
-        const appliedOperation =
-          planOperations.reduce<InstallmentOperation | null>(
-            (currentOperation, operation) => {
-              if (
-                operation.type !== 'anticipation' ||
-                originalOccurrenceDate <= operation.operationDate
-              ) {
-                return currentOperation;
-              }
-
-              return operation;
-            },
-            null,
-          );
 
         return {
           id: `${plan.id}:${installmentNumber}`,
@@ -141,13 +128,37 @@ export const buildInstallmentOccurrenceListItems = (
           totalInstallments: plan.installmentCount,
           amountInCents,
           originalOccurrenceDate,
-          occurrenceDate:
-            appliedOperation?.operationDate ?? originalOccurrenceDate,
-          anticipatedOperationId: appliedOperation?.id ?? null,
+          occurrenceDate: originalOccurrenceDate,
+          anticipatedOperationId: null,
           createdAt: plan.createdAt,
-          updatedAt: appliedOperation?.createdAt ?? plan.updatedAt,
+          updatedAt: plan.updatedAt,
         } satisfies InstallmentOccurrenceListItem;
-      });
+        },
+      );
+
+      for (const operation of planOperations) {
+        if (operation.type !== 'anticipation') {
+          continue;
+        }
+
+        const targetOccurrences = occurrences
+          .filter((occurrence) => occurrence.occurrenceDate > operation.operationDate)
+          .sort(
+            (left, right) =>
+              left.occurrenceDate.localeCompare(right.occurrenceDate) ||
+              left.installmentNumber - right.installmentNumber ||
+              left.id.localeCompare(right.id),
+          )
+          .slice(0, operation.affectedInstallmentCount);
+
+        for (const occurrence of targetOccurrences) {
+          occurrence.occurrenceDate = operation.operationDate;
+          occurrence.anticipatedOperationId = operation.id;
+          occurrence.updatedAt = operation.createdAt;
+        }
+      }
+
+      return occurrences;
     })
     .sort(
       (left, right) =>

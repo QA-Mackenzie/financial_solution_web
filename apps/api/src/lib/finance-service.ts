@@ -8,6 +8,7 @@ import type {
   Account,
   AccountListItem,
   AccountsSnapshot,
+  AnticipateInstallmentPlanInput,
   ArchiveAccountInput,
   CreditCardListItem,
   CreditCardPurchaseListItem,
@@ -20,12 +21,18 @@ import type {
   CreateCreditCardPurchaseInput,
   CreateContractAdjustmentInput,
   CreateContractInput,
+  CreateInstallmentPlanInput,
   CreateTransactionInput,
   EndContractInput,
   HorizonSettings,
   HorizonSnapshot,
+  InstallmentOperation,
+  InstallmentPlanListItem,
+  InstallmentsSnapshot,
   ManualTransaction,
   TransactionsSnapshot,
+  UpdateInstallmentAnticipationInput,
+  UpdateInstallmentPlanInput,
   UpdateCreditCardInput,
   UpdateCreditCardPurchaseInput,
   UpdateContractInput,
@@ -35,17 +42,22 @@ import type {
 } from '@shf/contracts';
 import {
   buildAccountsSnapshot,
+  buildCombinedCreditCardFinancials,
   buildContractsSnapshot,
   buildTransactionsSnapshot,
   sanitizeAccountInput,
   sanitizeCreditCardInput,
   sanitizeCreditCardPurchaseInput,
   sanitizeContractInput,
+  sanitizeInstallmentAnticipationInput,
+  sanitizeInstallmentPlanInput,
   sanitizeTransactionInput,
   validateAccountInput,
   validateCreditCardInput,
   validateCreditCardPurchaseInput,
   validateContractInput,
+  validateInstallmentAnticipationInput,
+  validateInstallmentPlanInput,
   validateTransactionInput,
 } from '@shf/domain-core';
 
@@ -73,6 +85,10 @@ type FinancialAuditAction =
   | 'CONTRACT_CREATED'
   | 'CONTRACT_ENDED'
   | 'CONTRACT_UPDATED'
+  | 'INSTALLMENT_ANTICIPATED'
+  | 'INSTALLMENT_ANTICIPATION_UPDATED'
+  | 'INSTALLMENT_PLAN_CREATED'
+  | 'INSTALLMENT_PLAN_UPDATED'
   | 'TRANSACTION_CREATED'
   | 'TRANSACTION_DELETED'
   | 'TRANSACTION_UPDATED';
@@ -81,6 +97,8 @@ type FinancialAuditResourceType =
   | 'account'
   | 'credit_card'
   | 'credit_card_purchase'
+  | 'installment_operation'
+  | 'installment_plan'
   | 'manual_transaction'
   | 'recurring_contract';
 
@@ -150,7 +168,30 @@ export class FinanceService {
   }
 
   async getCreditCardsSnapshot(userId: string): Promise<CreditCardsSnapshot> {
-    return this.dataAccess.creditCards.getSnapshot(
+    const currentDate = this.now().toISOString().slice(0, 10);
+    const [creditCardsSnapshot, installmentsSnapshot] = await Promise.all([
+      this.dataAccess.creditCards.getSnapshot(userId, currentDate),
+      this.dataAccess.installments.getSnapshot(userId, currentDate),
+    ]);
+    const combinedFinancials = buildCombinedCreditCardFinancials(
+      creditCardsSnapshot.cards,
+      creditCardsSnapshot.purchases,
+      installmentsSnapshot,
+      currentDate,
+    );
+
+    return {
+      ...creditCardsSnapshot,
+      cards: combinedFinancials.cards,
+      invoices: combinedFinancials.invoices,
+      projectedInvoices: combinedFinancials.projectedInvoices,
+      purchases: combinedFinancials.purchases,
+      totalInvoiceAmountInCents: combinedFinancials.totalInvoiceAmountInCents,
+    };
+  }
+
+  async getInstallmentsSnapshot(userId: string): Promise<InstallmentsSnapshot> {
+    return this.dataAccess.installments.getSnapshot(
       userId,
       this.now().toISOString().slice(0, 10),
     );
@@ -283,6 +324,48 @@ export class FinanceService {
     return creditCard;
   }
 
+  async createInstallmentPlan(
+    userId: string,
+    input: CreateInstallmentPlanInput,
+    context: FinanceRequestContext,
+  ): Promise<InstallmentPlanListItem> {
+    const sanitizedInput = sanitizeInstallmentPlanInput(input);
+    const issues = validateInstallmentPlanInput(sanitizedInput);
+
+    if (issues.length > 0) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', issues);
+    }
+
+    const plan = await this.database.runInTransaction(async (transaction) => {
+      const plan = await this.dataAccess.installments.create(
+        userId,
+        sanitizedInput,
+        this.now(),
+        transaction,
+      );
+
+      await this.insertAuditEvent(
+        transaction,
+        userId,
+        'installment_plan',
+        plan.id,
+        'INSTALLMENT_PLAN_CREATED',
+        context,
+        {
+          installmentCount: plan.installmentCount,
+          sourceType: plan.sourceType,
+          totalAmountInCents: plan.totalAmountInCents,
+        },
+      );
+
+      return plan;
+    });
+
+    this.invalidateHorizonCache(userId);
+
+    return plan;
+  }
+
   async updateCreditCard(
     userId: string,
     input: UpdateCreditCardInput,
@@ -325,6 +408,48 @@ export class FinanceService {
     this.invalidateHorizonCache(userId);
 
     return creditCard;
+  }
+
+  async updateInstallmentPlan(
+    userId: string,
+    input: UpdateInstallmentPlanInput,
+    context: FinanceRequestContext,
+  ): Promise<InstallmentPlanListItem> {
+    const sanitizedInput = sanitizeInstallmentPlanInput(input);
+    const issues = validateInstallmentPlanInput(sanitizedInput);
+
+    if (issues.length > 0) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', issues);
+    }
+
+    const plan = await this.database.runInTransaction(async (transaction) => {
+      const plan = await this.dataAccess.installments.update(
+        userId,
+        sanitizedInput,
+        this.now(),
+        transaction,
+      );
+
+      await this.insertAuditEvent(
+        transaction,
+        userId,
+        'installment_plan',
+        plan.id,
+        'INSTALLMENT_PLAN_UPDATED',
+        context,
+        {
+          installmentCount: plan.installmentCount,
+          sourceType: plan.sourceType,
+          totalAmountInCents: plan.totalAmountInCents,
+        },
+      );
+
+      return plan;
+    });
+
+    this.invalidateHorizonCache(userId);
+
+    return plan;
   }
 
   async createCreditCardPurchase(
@@ -370,6 +495,49 @@ export class FinanceService {
     return purchase;
   }
 
+  async anticipateInstallmentPlan(
+    userId: string,
+    input: AnticipateInstallmentPlanInput,
+    context: FinanceRequestContext,
+  ): Promise<InstallmentOperation> {
+    const sanitizedInput = sanitizeInstallmentAnticipationInput(input);
+    const issues = validateInstallmentAnticipationInput(sanitizedInput);
+
+    if (issues.length > 0) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', issues);
+    }
+
+    const operation = await this.database.runInTransaction(async (transaction) => {
+      const operation = await this.dataAccess.installments.anticipate(
+        userId,
+        sanitizedInput,
+        this.now(),
+        transaction,
+      );
+
+      await this.insertAuditEvent(
+        transaction,
+        userId,
+        'installment_operation',
+        operation.id,
+        'INSTALLMENT_ANTICIPATED',
+        context,
+        {
+          affectedAmountInCents: operation.affectedAmountInCents,
+          affectedInstallmentCount: operation.affectedInstallmentCount,
+          operationDate: operation.operationDate,
+          planId: operation.planId,
+        },
+      );
+
+      return operation;
+    });
+
+    this.invalidateHorizonCache(userId);
+
+    return operation;
+  }
+
   async updateCreditCardPurchase(
     userId: string,
     input: UpdateCreditCardPurchaseInput,
@@ -411,6 +579,48 @@ export class FinanceService {
     this.invalidateHorizonCache(userId);
 
     return purchase;
+  }
+
+  async updateInstallmentAnticipation(
+    userId: string,
+    input: UpdateInstallmentAnticipationInput,
+    context: FinanceRequestContext,
+  ): Promise<InstallmentOperation> {
+    const sanitizedInput = sanitizeInstallmentAnticipationInput(input);
+    const issues = validateInstallmentAnticipationInput(sanitizedInput);
+
+    if (issues.length > 0) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', issues);
+    }
+
+    const operation = await this.database.runInTransaction(async (transaction) => {
+      const operation = await this.dataAccess.installments.updateAnticipation(
+        userId,
+        sanitizedInput,
+        transaction,
+      );
+
+      await this.insertAuditEvent(
+        transaction,
+        userId,
+        'installment_operation',
+        operation.id,
+        'INSTALLMENT_ANTICIPATION_UPDATED',
+        context,
+        {
+          affectedAmountInCents: operation.affectedAmountInCents,
+          affectedInstallmentCount: operation.affectedInstallmentCount,
+          operationDate: operation.operationDate,
+          planId: operation.planId,
+        },
+      );
+
+      return operation;
+    });
+
+    this.invalidateHorizonCache(userId);
+
+    return operation;
   }
 
   async updateContract(
@@ -698,10 +908,11 @@ export class FinanceService {
     }
 
     const settings = await this.getHorizonSettings(userId);
-    const [accountsSnapshot, contractsSnapshot, creditCardsSnapshot, transactionsSnapshot] = await Promise.all([
+    const [accountsSnapshot, contractsSnapshot, creditCardsSnapshot, installmentsSnapshot, transactionsSnapshot] = await Promise.all([
       this.getAccountsSnapshot(userId),
       this.getContractsSnapshot(userId),
       this.getCreditCardsSnapshot(userId),
+      this.getInstallmentsSnapshot(userId),
       this.listTransactions(userId),
     ]);
     const snapshot = buildOfficialHorizonSnapshot({
@@ -709,6 +920,7 @@ export class FinanceService {
       contractsSnapshot,
       creditCardsSnapshot,
       generatedAt,
+      installmentsSnapshot,
       referenceDate,
       settings,
       transactionsSnapshot,

@@ -31,6 +31,15 @@ const emptyCreditCardsSnapshot = {
   totalInvoiceAmountInCents: 0,
 };
 
+const emptyInstallmentsSnapshot = {
+  plans: [],
+  occurrences: [],
+  operations: [],
+  projectedAccountOccurrences: [],
+  projectedCreditCardPurchases: [],
+  totalRemainingAmountInCents: 0,
+};
+
 describe('buildOfficialHorizonSnapshot', () => {
   it('preserva a trajetoria positiva da fixture oficial do dominio', () => {
     const settings = {
@@ -45,6 +54,7 @@ describe('buildOfficialHorizonSnapshot', () => {
       creditCardsSnapshot: emptyCreditCardsSnapshot,
       contractsSnapshot: emptyContractsSnapshot,
       generatedAt: '2026-04-24T12:00:00.000Z',
+      installmentsSnapshot: emptyInstallmentsSnapshot,
       referenceDate: positiveTrajectoryFixture.options.currentDate ?? '2026-04-24',
       settings,
       transactionsSnapshot: positiveTrajectoryFixture.transactionsSnapshot,
@@ -78,6 +88,7 @@ describe('buildOfficialHorizonSnapshot', () => {
       creditCardsSnapshot: emptyCreditCardsSnapshot,
       contractsSnapshot: emptyContractsSnapshot,
       generatedAt: '2026-04-24T12:00:00.000Z',
+      installmentsSnapshot: emptyInstallmentsSnapshot,
       referenceDate: marginPressureFixture.options.currentDate ?? '2026-04-24',
       settings,
       transactionsSnapshot: marginPressureFixture.transactionsSnapshot,
@@ -111,6 +122,7 @@ describe('buildOfficialHorizonSnapshot', () => {
       creditCardsSnapshot: emptyCreditCardsSnapshot,
       contractsSnapshot: emptyContractsSnapshot,
       generatedAt: '2026-04-24T12:00:00.000Z',
+      installmentsSnapshot: emptyInstallmentsSnapshot,
       referenceDate:
         multiAccountConsolidatedFixture.options.currentDate ?? '2026-04-24',
       settings,
@@ -191,6 +203,7 @@ describe('buildOfficialHorizonSnapshot', () => {
       creditCardsSnapshot: emptyCreditCardsSnapshot,
       contractsSnapshot,
       generatedAt: '2026-05-20T12:00:00.000Z',
+      installmentsSnapshot: emptyInstallmentsSnapshot,
       referenceDate: '2026-05-20',
       settings,
       transactionsSnapshot: {
@@ -328,7 +341,43 @@ describe('buildOfficialHorizonSnapshot', () => {
           ],
         },
       ],
-      projectedInvoices: [],
+      projectedInvoices: buildProjectedCreditCardInvoiceOccurrences(
+        [
+          {
+            id: 'card-1:2026-06',
+            creditCardId: 'card-1',
+            creditCardName: 'Visa principal',
+            paymentAccountId: 'checking',
+            paymentAccountName: 'Conta principal',
+            invoiceMonth: '2026-06',
+            cycleStartDate: '2026-04-26',
+            cycleEndDate: '2026-05-25',
+            dueDate: '2026-06-08',
+            totalAmountInCents: 50000,
+            purchaseCount: 1,
+            status: 'open' as const,
+            purchases: [
+              {
+                id: 'purchase-1',
+                creditCardId: 'card-1',
+                creditCardName: 'Visa principal',
+                paymentAccountId: 'checking',
+                paymentAccountName: 'Conta principal',
+                description: 'Notebook',
+                amountInCents: 50000,
+                purchaseDate: '2026-05-02',
+                invoiceMonth: '2026-06',
+                cycleStartDate: '2026-04-26',
+                cycleEndDate: '2026-05-25',
+                dueDate: '2026-06-08',
+                createdAt: '2026-05-02T12:00:00.000Z',
+                updatedAt: '2026-05-02T12:00:00.000Z',
+              },
+            ],
+          },
+        ],
+        '2026-05-06',
+      ),
       totalCreditLimitInCents: 300000,
       totalInvoiceAmountInCents: 50000,
     };
@@ -358,6 +407,7 @@ describe('buildOfficialHorizonSnapshot', () => {
       creditCardsSnapshot,
       contractsSnapshot: emptyContractsSnapshot,
       generatedAt: '2026-05-06T12:00:00.000Z',
+      installmentsSnapshot: emptyInstallmentsSnapshot,
       referenceDate: '2026-05-06',
       settings,
       transactionsSnapshot: {
@@ -406,5 +456,103 @@ describe('buildOfficialHorizonSnapshot', () => {
     expect(snapshot.horizon.months.slice(0, 3).map((month) => month.expenseInCents)).toEqual(
       [0, 50000, 0],
     );
+  });
+
+  it('integra parcelas projetadas em conta ao horizonte oficial', () => {
+    const settings = {
+      safetyMarginInCents: DEFAULT_HORIZON_SAFETY_MARGIN_IN_CENTS,
+      variableExpenseWindowInMonths: DEFAULT_VARIABLE_EXPENSE_WINDOW_IN_MONTHS,
+    };
+
+    const snapshot = buildOfficialHorizonSnapshot({
+      accountsSnapshot: {
+        activeAccounts: [
+          {
+            id: 'checking',
+            name: 'Conta principal',
+            type: 'checking',
+            openingBalanceInCents: 200000,
+            currentBalanceInCents: 200000,
+            isArchived: false,
+            archivedAt: null,
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-05-01T00:00:00.000Z',
+          },
+        ],
+        archivedAccounts: [],
+        consolidatedBalanceInCents: 200000,
+      },
+      creditCardsSnapshot: emptyCreditCardsSnapshot,
+      contractsSnapshot: emptyContractsSnapshot,
+      generatedAt: '2026-05-01T12:00:00.000Z',
+      installmentsSnapshot: {
+        ...emptyInstallmentsSnapshot,
+        projectedAccountOccurrences: [
+          {
+            id: 'plan-1:1',
+            planId: '11111111-1111-4111-8111-111111111111',
+            description: 'Notebook parcelado',
+            accountId: 'checking',
+            accountName: 'Conta principal',
+            amountInCents: 30000,
+            signedAmountInCents: -30000,
+            occurrenceDate: '2026-05-05',
+            installmentNumber: 1,
+            totalInstallments: 4,
+          },
+          {
+            id: 'plan-1:2',
+            planId: '11111111-1111-4111-8111-111111111111',
+            description: 'Notebook parcelado',
+            accountId: 'checking',
+            accountName: 'Conta principal',
+            amountInCents: 30000,
+            signedAmountInCents: -30000,
+            occurrenceDate: '2026-05-05',
+            installmentNumber: 2,
+            totalInstallments: 4,
+          },
+          {
+            id: 'plan-1:3',
+            planId: '11111111-1111-4111-8111-111111111111',
+            description: 'Notebook parcelado',
+            accountId: 'checking',
+            accountName: 'Conta principal',
+            amountInCents: 30000,
+            signedAmountInCents: -30000,
+            occurrenceDate: '2026-05-05',
+            installmentNumber: 3,
+            totalInstallments: 4,
+          },
+          {
+            id: 'plan-1:4',
+            planId: '11111111-1111-4111-8111-111111111111',
+            description: 'Notebook parcelado',
+            accountId: 'checking',
+            accountName: 'Conta principal',
+            amountInCents: 30000,
+            signedAmountInCents: -30000,
+            occurrenceDate: '2026-08-10',
+            installmentNumber: 4,
+            totalInstallments: 4,
+          },
+        ],
+        totalRemainingAmountInCents: 120000,
+      },
+      referenceDate: '2026-05-01',
+      settings,
+      transactionsSnapshot: {
+        totalIncomeInCents: 0,
+        totalExpenseInCents: 0,
+        transactions: [],
+      },
+    });
+
+    expect(snapshot.horizon.months.slice(0, 4).map((month) => month.expenseInCents)).toEqual([
+      90000,
+      0,
+      0,
+      30000,
+    ]);
   });
 });
