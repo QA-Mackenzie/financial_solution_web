@@ -5,11 +5,15 @@ import type {
   HorizonSettings,
   HorizonSnapshot,
   InstallmentsSnapshot,
+  ProvisionsSnapshot,
   TransactionsSnapshot,
+  VariableExpenseOverride,
 } from '@shf/contracts';
 import {
   buildFinancialHorizon,
+  buildProjectedProvisionOccurrences,
   buildProjectedContractOccurrences,
+  buildProvisionAdjustedHorizon,
   buildProjectedVariableExpenseOccurrences,
 } from '@shf/domain-core';
 
@@ -21,9 +25,11 @@ type BuildOfficialHorizonSnapshotInput = {
   contractsSnapshot: ContractsSnapshot;
   generatedAt: string;
   installmentsSnapshot: InstallmentsSnapshot;
+  provisionsSnapshot?: ProvisionsSnapshot;
   referenceDate: string;
   settings: HorizonSettings;
   transactionsSnapshot: TransactionsSnapshot;
+  variableExpenseOverrides?: VariableExpenseOverride[];
 };
 
 export function buildOfficialHorizonSnapshot({
@@ -32,9 +38,15 @@ export function buildOfficialHorizonSnapshot({
   contractsSnapshot,
   generatedAt,
   installmentsSnapshot,
+  provisionsSnapshot = {
+    activeProvisions: [],
+    redeemedProvisions: [],
+    totalActiveTargetAmountInCents: 0,
+  },
   referenceDate,
   settings,
   transactionsSnapshot,
+  variableExpenseOverrides = [],
 }: BuildOfficialHorizonSnapshotInput): HorizonSnapshot {
   const projectedContractOccurrences = buildProjectedContractOccurrences(
     contractsSnapshot,
@@ -46,22 +58,38 @@ export function buildOfficialHorizonSnapshot({
   const projectedVariableExpenseOccurrences =
     buildProjectedVariableExpenseOccurrences(accountsSnapshot, transactionsSnapshot, {
       currentDate: referenceDate,
+      overrides: variableExpenseOverrides,
       totalMonths: OFFICIAL_HORIZON_TOTAL_MONTHS,
       windowInMonths: settings.variableExpenseWindowInMonths,
     });
+  const projectedProvisionOccurrences = buildProjectedProvisionOccurrences(
+    provisionsSnapshot,
+    {
+      currentDate: referenceDate,
+      totalMonths: OFFICIAL_HORIZON_TOTAL_MONTHS,
+    },
+  );
+  const baseHorizon = buildFinancialHorizon(accountsSnapshot, transactionsSnapshot, {
+    currentDate: referenceDate,
+    projectedCreditCardInvoiceOccurrences: creditCardsSnapshot.projectedInvoices,
+    projectedContractOccurrences,
+    projectedInstallmentOccurrences:
+      installmentsSnapshot.projectedAccountOccurrences,
+    totalMonths: OFFICIAL_HORIZON_TOTAL_MONTHS,
+    safetyMarginInCents: settings.safetyMarginInCents,
+    projectedVariableExpenseOccurrences,
+  });
 
   return {
     generatedAt,
-    horizon: buildFinancialHorizon(accountsSnapshot, transactionsSnapshot, {
-      currentDate: referenceDate,
-      projectedCreditCardInvoiceOccurrences: creditCardsSnapshot.projectedInvoices,
-      projectedContractOccurrences,
-      projectedInstallmentOccurrences:
-        installmentsSnapshot.projectedAccountOccurrences,
-      totalMonths: OFFICIAL_HORIZON_TOTAL_MONTHS,
-      safetyMarginInCents: settings.safetyMarginInCents,
-      projectedVariableExpenseOccurrences,
-    }),
+    horizon:
+      projectedProvisionOccurrences.length > 0
+        ? buildProvisionAdjustedHorizon(
+            baseHorizon,
+            projectedProvisionOccurrences,
+            settings.safetyMarginInCents,
+          )
+        : baseHorizon,
     settings,
   };
 }

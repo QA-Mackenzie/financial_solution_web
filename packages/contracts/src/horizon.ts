@@ -28,6 +28,11 @@ export const financialHorizonMonthSchema = z.object({
   incomeInCents: z.number().int(),
   expenseInCents: z.number().int(),
   closingBalanceInCents: z.number().int(),
+  cashOpeningBalanceInCents: z.number().int().optional(),
+  cashClosingBalanceInCents: z.number().int().optional(),
+  provisionAllocationInCents: z.number().int().optional(),
+  provisionReleaseInCents: z.number().int().optional(),
+  provisionReservedBalanceInCents: z.number().int().optional(),
   riskLevel: horizonRiskLevelSchema,
 });
 
@@ -55,6 +60,11 @@ export interface FinancialHorizonMonth {
   incomeInCents: number;
   expenseInCents: number;
   closingBalanceInCents: number;
+  cashOpeningBalanceInCents?: number;
+  cashClosingBalanceInCents?: number;
+  provisionAllocationInCents?: number;
+  provisionReleaseInCents?: number;
+  provisionReservedBalanceInCents?: number;
   riskLevel: HorizonRiskLevel;
 }
 

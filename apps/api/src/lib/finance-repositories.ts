@@ -20,6 +20,7 @@ import type {
   CreateContractAdjustmentInput,
   CreateContractInput,
   CreateInstallmentPlanInput,
+  CreateProvisionInput,
   CreateTagInput,
   CreateTransactionInput,
   EndContractInput,
@@ -29,16 +30,24 @@ import type {
   InstallmentPlanListItem,
   InstallmentsSnapshot,
   ManualTransaction,
+  Provision,
+  ProvisionListItem,
+  ProvisionsSnapshot,
+  RedeemProvisionInput,
+  RemoveVariableExpenseOverrideInput,
   Tag,
   TagListItem,
   UpdateInstallmentAnticipationInput,
   UpdateInstallmentPlanInput,
+  UpdateProvisionInput,
   UpdateCreditCardInput,
   UpdateCreditCardPurchaseInput,
   UpdateContractInput,
   UpdateAccountInput,
   UpdateTransactionInput,
   TransactionListItem,
+  VariableExpenseOverride,
+  VariableExpenseOverrideListItem,
 } from '@shf/contracts';
 import {
   buildCreditCardInvoices,
@@ -52,6 +61,7 @@ import {
   sanitizeAccountInput,
   sanitizeInstallmentAnticipationInput,
   sanitizeInstallmentPlanInput,
+  sanitizeProvisionInput,
   sanitizeCreditCardInput,
   sanitizeCreditCardPurchaseInput,
   sanitizeContractInput,
@@ -251,6 +261,34 @@ type InstallmentOperationRow = QueryResultRow & {
   user_id: string;
 };
 
+type ProvisionRow = QueryResultRow & {
+  account_id: string;
+  account_name?: string;
+  category: string;
+  created_at: Date | string;
+  description: string;
+  id: string;
+  redeemed_at: Date | string | null;
+  start_date: Date | string;
+  status: Provision['status'];
+  target_amount_in_cents: number | string;
+  target_date: Date | string;
+  updated_at: Date | string;
+  user_id: string;
+};
+
+type VariableExpenseOverrideRow = QueryResultRow & {
+  account_id: string;
+  account_name?: string;
+  amount_in_cents: number | string;
+  created_at: Date | string;
+  description: string;
+  id: string;
+  occurrence_date: Date | string;
+  updated_at: Date | string;
+  user_id: string;
+};
+
 type LegacyImportBatchRow = QueryResultRow & {
   created_at: Date | string;
   id: string;
@@ -432,6 +470,25 @@ async function assertOwnedInstallmentOperation(
       404,
       'FINANCE_INSTALLMENT_OPERATION_NOT_FOUND',
       'Operacao de parcelamento nao encontrada para o usuario autenticado.',
+    );
+  }
+}
+
+async function assertOwnedProvision(
+  database: DatabaseExecutor,
+  userId: string,
+  provisionId: string,
+): Promise<void> {
+  const result = await database.query<{ id: string }>(
+    'select id from finance.provisions where user_id = $1 and id = $2',
+    [userId, provisionId],
+  );
+
+  if ((result.rowCount ?? 0) === 0) {
+    throw new AppError(
+      404,
+      'FINANCE_PROVISION_NOT_FOUND',
+      'Provisao nao encontrada para o usuario autenticado.',
     );
   }
 }
@@ -801,6 +858,70 @@ function buildInstallmentsSnapshotFromRows(
   };
 }
 
+  function mapProvision(row: ProvisionRow): Provision {
+    return {
+      accountId: row.account_id,
+      category: row.category,
+      createdAt: toIsoString(row.created_at),
+      description: row.description,
+      id: row.id,
+      redeemedAt: row.redeemed_at ? toDateOnly(row.redeemed_at) : null,
+      startDate: toDateOnly(row.start_date),
+      status: row.status,
+      targetAmountInCents: toNumber(row.target_amount_in_cents),
+      targetDate: toDateOnly(row.target_date),
+      updatedAt: toIsoString(row.updated_at),
+    };
+  }
+
+  function mapProvisionListItem(row: ProvisionRow): ProvisionListItem {
+    return {
+      ...mapProvision(row),
+      accountName: row.account_name ?? '',
+    };
+  }
+
+  function buildProvisionsSnapshotFromRows(rows: ProvisionRow[]): ProvisionsSnapshot {
+    const listItems = rows.map(mapProvisionListItem);
+    const activeProvisions = listItems
+      .filter((provision) => provision.status === 'active')
+      .sort((left, right) =>
+        left.targetDate.localeCompare(right.targetDate) ||
+        left.description.localeCompare(right.description),
+      );
+    const redeemedProvisions = listItems
+      .filter((provision) => provision.status === 'redeemed')
+      .sort((left, right) =>
+        (right.redeemedAt ?? right.targetDate).localeCompare(
+          left.redeemedAt ?? left.targetDate,
+        ) || left.description.localeCompare(right.description),
+      );
+
+    return {
+      activeProvisions,
+      redeemedProvisions,
+      totalActiveTargetAmountInCents: activeProvisions.reduce(
+        (sum, provision) => sum + provision.targetAmountInCents,
+        0,
+      ),
+    };
+  }
+
+  function mapVariableExpenseOverride(
+    row: VariableExpenseOverrideRow,
+  ): VariableExpenseOverrideListItem {
+    return {
+      accountId: row.account_id,
+      accountName: row.account_name ?? '',
+      amountInCents: toNumber(row.amount_in_cents),
+      createdAt: toIsoString(row.created_at),
+      description: row.description,
+      id: row.id,
+      occurrenceDate: toDateOnly(row.occurrence_date),
+      updatedAt: toIsoString(row.updated_at),
+    };
+  }
+
 function mapTransactionListItem(row: ManualTransactionRow): TransactionListItem {
   const transaction = mapManualTransaction(row);
   const signedAmountInCents =
@@ -974,6 +1095,44 @@ function buildInstallmentOperationsSelect(whereClause: string) {
                  io.affected_amount_in_cents,
                  io.created_at
           from finance.installment_operations io
+          ${whereClause}`;
+}
+
+function buildProvisionsSelect(whereClause: string) {
+  return `select p.id,
+                 p.user_id,
+                 p.account_id,
+                 p.description,
+                 p.category,
+                 p.target_amount_in_cents,
+                 p.start_date,
+                 p.target_date,
+                 p.status,
+                 p.redeemed_at,
+                 p.created_at,
+                 p.updated_at,
+                 a.name as account_name
+          from finance.provisions p
+          join finance.accounts a
+            on a.user_id = p.user_id
+           and a.id = p.account_id
+          ${whereClause}`;
+}
+
+function buildVariableExpenseOverridesSelect(whereClause: string) {
+  return `select veo.id,
+                 veo.user_id,
+                 veo.account_id,
+                 veo.description,
+                 veo.occurrence_date,
+                 veo.amount_in_cents,
+                 veo.created_at,
+                 veo.updated_at,
+                 a.name as account_name
+          from finance.variable_expense_overrides veo
+          join finance.accounts a
+            on a.user_id = veo.user_id
+           and a.id = veo.account_id
           ${whereClause}`;
 }
 
@@ -1538,6 +1697,383 @@ export class ContractsRepository {
     return result.rows.map((row) =>
       mapContractListItem(row, adjustmentsByContractId.get(row.id) ?? []),
     );
+  }
+}
+
+export class ProvisionsRepository {
+  constructor(private readonly database: DatabaseClient) {}
+
+  async create(
+    userId: string,
+    input: CreateProvisionInput,
+    now = new Date(),
+    database: DatabaseExecutor = this.database,
+  ): Promise<ProvisionListItem> {
+    const sanitizedInput = sanitizeProvisionInput(input);
+    const id = randomUUID();
+    const nowIsoString = now.toISOString();
+
+    await assertOwnedAccount(database, userId, sanitizedInput.accountId);
+
+    await database.query(
+      `insert into finance.provisions (
+         id,
+         user_id,
+         account_id,
+         description,
+         category,
+         target_amount_in_cents,
+         start_date,
+         target_date,
+         status,
+         redeemed_at,
+         payload,
+         created_at,
+         updated_at
+       ) values (
+         $1,
+         $2,
+         $3,
+         $4,
+         $5,
+         $6,
+         $7,
+         $8,
+         'active',
+         null,
+         '{}'::jsonb,
+         $9,
+         $9
+       )`,
+      [
+        id,
+        userId,
+        sanitizedInput.accountId,
+        sanitizedInput.description,
+        sanitizedInput.category,
+        sanitizedInput.targetAmountInCents,
+        sanitizedInput.startDate,
+        sanitizedInput.targetDate,
+        nowIsoString,
+      ],
+    );
+
+    const provision = await this.findById(userId, id, database);
+
+    if (!provision) {
+      throw new AppError(
+        500,
+        'FINANCE_PROVISION_CREATE_FAILED',
+        'Falha ao criar provisao.',
+      );
+    }
+
+    return provision;
+  }
+
+  async update(
+    userId: string,
+    input: UpdateProvisionInput,
+    now = new Date(),
+    database: DatabaseExecutor = this.database,
+  ): Promise<ProvisionListItem> {
+    const sanitizedInput = sanitizeProvisionInput(input);
+    const nowIsoString = now.toISOString();
+
+    await assertOwnedProvision(database, userId, sanitizedInput.id);
+    await assertOwnedAccount(database, userId, sanitizedInput.accountId);
+
+    const result = await database.query<{ id: string }>(
+      `update finance.provisions
+          set account_id = $3,
+              description = $4,
+              category = $5,
+              target_amount_in_cents = $6,
+              start_date = $7,
+              target_date = $8,
+              status = 'active',
+              redeemed_at = null,
+              updated_at = $9
+        where user_id = $1 and id = $2
+        returning id`,
+      [
+        userId,
+        sanitizedInput.id,
+        sanitizedInput.accountId,
+        sanitizedInput.description,
+        sanitizedInput.category,
+        sanitizedInput.targetAmountInCents,
+        sanitizedInput.startDate,
+        sanitizedInput.targetDate,
+        nowIsoString,
+      ],
+    );
+
+    if ((result.rowCount ?? 0) === 0) {
+      throw new AppError(
+        404,
+        'FINANCE_PROVISION_NOT_FOUND',
+        'Provisao nao encontrada para o usuario autenticado.',
+      );
+    }
+
+    const provision = await this.findById(userId, sanitizedInput.id, database);
+
+    if (!provision) {
+      throw new AppError(
+        500,
+        'FINANCE_PROVISION_UPDATE_FAILED',
+        'Falha ao atualizar provisao.',
+      );
+    }
+
+    return provision;
+  }
+
+  async redeem(
+    userId: string,
+    input: RedeemProvisionInput,
+    now = new Date(),
+    database: DatabaseExecutor = this.database,
+  ): Promise<ProvisionListItem> {
+    await assertOwnedProvision(database, userId, input.provisionId);
+
+    const result = await database.query<{ id: string }>(
+      `update finance.provisions
+          set status = 'redeemed',
+              redeemed_at = $3,
+              updated_at = $4
+        where user_id = $1 and id = $2
+        returning id`,
+      [userId, input.provisionId, input.redeemedAt, now.toISOString()],
+    );
+
+    if ((result.rowCount ?? 0) === 0) {
+      throw new AppError(
+        404,
+        'FINANCE_PROVISION_NOT_FOUND',
+        'Provisao nao encontrada para o usuario autenticado.',
+      );
+    }
+
+    const provision = await this.findById(userId, input.provisionId, database);
+
+    if (!provision) {
+      throw new AppError(
+        500,
+        'FINANCE_PROVISION_REDEEM_FAILED',
+        'Falha ao resgatar provisao.',
+      );
+    }
+
+    return provision;
+  }
+
+  async findById(
+    userId: string,
+    provisionId: string,
+    database: DatabaseExecutor = this.database,
+  ): Promise<ProvisionListItem | null> {
+    const result = await database.query<ProvisionRow>(
+      `${buildProvisionsSelect('where p.user_id = $1 and p.id = $2')}
+       order by p.target_date asc, p.description asc`,
+      [userId, provisionId],
+    );
+
+    const row = result.rows[0];
+
+    return row ? mapProvisionListItem(row) : null;
+  }
+
+  async listByUserId(userId: string): Promise<ProvisionListItem[]> {
+    const result = await this.database.query<ProvisionRow>(
+      `${buildProvisionsSelect('where p.user_id = $1')}
+       order by p.status asc, p.target_date asc, p.description asc`,
+      [userId],
+    );
+
+    return result.rows.map(mapProvisionListItem);
+  }
+
+  async getSnapshot(userId: string): Promise<ProvisionsSnapshot> {
+    const result = await this.database.query<ProvisionRow>(
+      `${buildProvisionsSelect('where p.user_id = $1')}
+       order by p.status asc, p.target_date asc, p.description asc`,
+      [userId],
+    );
+
+    return buildProvisionsSnapshotFromRows(result.rows);
+  }
+}
+
+export class VariableExpenseOverridesRepository {
+  constructor(private readonly database: DatabaseClient) {}
+
+  async upsert(
+    userId: string,
+    input: VariableExpenseOverride,
+    now = new Date(),
+    database: DatabaseExecutor = this.database,
+  ): Promise<VariableExpenseOverrideListItem> {
+    const nowIsoString = now.toISOString();
+
+    await assertOwnedAccount(database, userId, input.accountId);
+
+    const existing = await this.findByNaturalKey(userId, input, database);
+
+    if (existing) {
+      await database.query(
+        `update finance.variable_expense_overrides
+            set amount_in_cents = $5,
+                updated_at = $6
+          where user_id = $1
+            and account_id = $2
+            and description = $3
+            and occurrence_date = $4`,
+        [
+          userId,
+          input.accountId,
+          input.description,
+          input.occurrenceDate,
+          input.amountInCents,
+          nowIsoString,
+        ],
+      );
+
+      const updated = await this.findById(userId, existing.id, database);
+
+      if (!updated) {
+        throw new AppError(
+          500,
+          'FINANCE_VARIABLE_EXPENSE_OVERRIDE_UPDATE_FAILED',
+          'Falha ao atualizar override de despesa variavel.',
+        );
+      }
+
+      return updated;
+    }
+
+    const id = randomUUID();
+    await database.query(
+      `insert into finance.variable_expense_overrides (
+         id,
+         user_id,
+         account_id,
+         description,
+         occurrence_date,
+         amount_in_cents,
+         payload,
+         created_at,
+         updated_at
+       ) values (
+         $1,
+         $2,
+         $3,
+         $4,
+         $5,
+         $6,
+         '{}'::jsonb,
+         $7,
+         $7
+       )`,
+      [
+        id,
+        userId,
+        input.accountId,
+        input.description,
+        input.occurrenceDate,
+        input.amountInCents,
+        nowIsoString,
+      ],
+    );
+
+    const created = await this.findById(userId, id, database);
+
+    if (!created) {
+      throw new AppError(
+        500,
+        'FINANCE_VARIABLE_EXPENSE_OVERRIDE_CREATE_FAILED',
+        'Falha ao criar override de despesa variavel.',
+      );
+    }
+
+    return created;
+  }
+
+  async remove(
+    userId: string,
+    input: RemoveVariableExpenseOverrideInput,
+    database: DatabaseExecutor = this.database,
+  ): Promise<VariableExpenseOverrideListItem> {
+    const existing = await this.findByNaturalKey(userId, input, database);
+
+    if (!existing) {
+      throw new AppError(
+        404,
+        'FINANCE_VARIABLE_EXPENSE_OVERRIDE_NOT_FOUND',
+        'Override de despesa variavel nao encontrado para o usuario autenticado.',
+      );
+    }
+
+    await database.query(
+      `delete from finance.variable_expense_overrides
+        where user_id = $1
+          and account_id = $2
+          and description = $3
+          and occurrence_date = $4`,
+      [userId, input.accountId, input.description, input.occurrenceDate],
+    );
+
+    return existing;
+  }
+
+  async findById(
+    userId: string,
+    overrideId: string,
+    database: DatabaseExecutor = this.database,
+  ): Promise<VariableExpenseOverrideListItem | null> {
+    const result = await database.query<VariableExpenseOverrideRow>(
+      `${buildVariableExpenseOverridesSelect(
+        'where veo.user_id = $1 and veo.id = $2',
+      )}
+       order by veo.occurrence_date asc, veo.description asc`,
+      [userId, overrideId],
+    );
+
+    const row = result.rows[0];
+
+    return row ? mapVariableExpenseOverride(row) : null;
+  }
+
+  async findByNaturalKey(
+    userId: string,
+    input: Pick<
+      VariableExpenseOverride,
+      'accountId' | 'description' | 'occurrenceDate'
+    >,
+    database: DatabaseExecutor = this.database,
+  ): Promise<VariableExpenseOverrideListItem | null> {
+    const result = await database.query<VariableExpenseOverrideRow>(
+      `${buildVariableExpenseOverridesSelect(
+        'where veo.user_id = $1 and veo.account_id = $2 and veo.description = $3 and veo.occurrence_date = $4',
+      )}
+       order by veo.occurrence_date asc, veo.description asc`,
+      [userId, input.accountId, input.description, input.occurrenceDate],
+    );
+
+    const row = result.rows[0];
+
+    return row ? mapVariableExpenseOverride(row) : null;
+  }
+
+  async listByUserId(userId: string): Promise<VariableExpenseOverrideListItem[]> {
+    const result = await this.database.query<VariableExpenseOverrideRow>(
+      `${buildVariableExpenseOverridesSelect('where veo.user_id = $1')}
+       order by veo.occurrence_date asc, veo.description asc`,
+      [userId],
+    );
+
+    return result.rows.map(mapVariableExpenseOverride);
   }
 }
 
@@ -2830,11 +3366,15 @@ export class FinancialDataAccess {
 
   readonly contracts: ContractsRepository;
 
+  readonly provisions: ProvisionsRepository;
+
   readonly installments: InstallmentsRepository;
 
   readonly legacyImport: LegacyImportRepository;
 
   readonly manualTransactions: ManualTransactionsRepository;
+
+  readonly variableExpenseOverrides: VariableExpenseOverridesRepository;
 
   readonly tags: TagsRepository;
 
@@ -2844,9 +3384,11 @@ export class FinancialDataAccess {
     this.accounts = new AccountsRepository(database);
     this.creditCards = new CreditCardsRepository(database);
     this.contracts = new ContractsRepository(database);
+    this.provisions = new ProvisionsRepository(database);
     this.installments = new InstallmentsRepository(database);
     this.legacyImport = new LegacyImportRepository(database);
     this.manualTransactions = new ManualTransactionsRepository(database);
+    this.variableExpenseOverrides = new VariableExpenseOverridesRepository(database);
     this.tags = new TagsRepository(database);
     this.userSettings = new UserSettingsRepository(database);
   }

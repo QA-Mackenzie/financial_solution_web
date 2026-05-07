@@ -9,6 +9,7 @@ import {
   createAccountInputSchema,
   createContractAdjustmentInputSchema,
   createContractInputSchema,
+  createProvisionInputSchema,
   createTransactionInputSchema,
   accountsSnapshotSchema,
   accountListItemSchema,
@@ -25,15 +26,23 @@ import {
   installmentPlanListItemSchema,
   installmentsSnapshotSchema,
   manualTransactionSchema,
+  provisionListItemSchema,
+  provisionsPlanningSnapshotSchema,
+  redeemProvisionInputSchema,
+  removeVariableExpenseOverrideInputSchema,
   transactionsSnapshotSchema,
   updateInstallmentAnticipationInputSchema,
   updateInstallmentPlanInputSchema,
+  updateProvisionInputSchema,
   updateCreditCardInputSchema,
   updateCreditCardPurchaseInputSchema,
   updateContractInputSchema,
   updateHorizonSettingsInputSchema,
   updateAccountInputSchema,
   updateTransactionInputSchema,
+  variableExpenseOverrideListItemSchema,
+  variableExpenseOverrideSchema,
+  variableExpenseSnapshotSchema,
 } from '@shf/contracts';
 import { z } from 'zod';
 
@@ -75,6 +84,14 @@ const installmentsSnapshotResponseSchema = z.object({
   snapshot: installmentsSnapshotSchema,
 });
 
+const provisionsSnapshotResponseSchema = z.object({
+  snapshot: provisionsPlanningSnapshotSchema,
+});
+
+const variableExpenseSnapshotResponseSchema = z.object({
+  snapshot: variableExpenseSnapshotSchema,
+});
+
 const creditCardResponseSchema = z.object({
   creditCard: creditCardListItemSchema,
 });
@@ -85,6 +102,14 @@ const installmentPlanResponseSchema = z.object({
 
 const installmentOperationResponseSchema = z.object({
   operation: installmentOperationSchema,
+});
+
+const provisionResponseSchema = z.object({
+  provision: provisionListItemSchema,
+});
+
+const variableExpenseOverrideResponseSchema = z.object({
+  override: variableExpenseOverrideListItemSchema,
 });
 
 const creditCardPurchaseResponseSchema = z.object({
@@ -111,6 +136,10 @@ const createContractAdjustmentBodySchema =
   createContractAdjustmentInputSchema.omit({ contractId: true });
 
 const endContractBodySchema = endContractInputSchema.omit({ contractId: true });
+
+const redeemProvisionBodySchema = redeemProvisionInputSchema.omit({
+  provisionId: true,
+});
 
 const idParamSchema = z.object({
   id: z.string().uuid('Identificador invalido.'),
@@ -175,6 +204,30 @@ export function financeRoutes(financeService: FinanceService): FastifyPluginAsyn
       );
 
       return reply.send(installmentsSnapshotResponseSchema.parse({ snapshot }));
+    });
+
+    app.get('/api/v1/provisions', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const snapshot = await financeService.getProvisionsSnapshot(
+        authorizedSession.userId,
+      );
+
+      return reply.send(provisionsSnapshotResponseSchema.parse({ snapshot }));
+    });
+
+    app.get('/api/v1/variable-expense-overrides', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const snapshot = await financeService.getVariableExpenseSnapshot(
+        authorizedSession.userId,
+      );
+
+      return reply.send(
+        variableExpenseSnapshotResponseSchema.parse({ snapshot }),
+      );
     });
 
     app.post('/api/v1/accounts', async (request, reply) => {
@@ -299,6 +352,30 @@ export function financeRoutes(financeService: FinanceService): FastifyPluginAsyn
       );
 
       return reply.code(201).send(installmentPlanResponseSchema.parse({ plan }));
+    });
+
+    app.post('/api/v1/provisions', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const parsedBody = createProvisionInputSchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedBody.error.flatten(),
+        );
+      }
+
+      const provision = await financeService.createProvision(
+        authorizedSession.userId,
+        parsedBody.data,
+        getRequestContext(request),
+      );
+
+      return reply.code(201).send(provisionResponseSchema.parse({ provision }));
     });
 
     app.post('/api/v1/installment-operations', async (request, reply) => {
@@ -477,6 +554,108 @@ export function financeRoutes(financeService: FinanceService): FastifyPluginAsyn
       );
 
       return reply.send(installmentPlanResponseSchema.parse({ plan }));
+    });
+
+    app.put('/api/v1/provisions/:id', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const parsedParams = idParamSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedParams.error.flatten(),
+        );
+      }
+
+      const parsedBody = createProvisionInputSchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedBody.error.flatten(),
+        );
+      }
+
+      const provision = await financeService.updateProvision(
+        authorizedSession.userId,
+        updateProvisionInputSchema.parse({
+          ...parsedBody.data,
+          id: parsedParams.data.id,
+        }),
+        getRequestContext(request),
+      );
+
+      return reply.send(provisionResponseSchema.parse({ provision }));
+    });
+
+    app.post('/api/v1/provisions/:id/redeem', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const parsedParams = idParamSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedParams.error.flatten(),
+        );
+      }
+
+      const parsedBody = redeemProvisionBodySchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedBody.error.flatten(),
+        );
+      }
+
+      const provision = await financeService.redeemProvision(
+        authorizedSession.userId,
+        redeemProvisionInputSchema.parse({
+          ...parsedBody.data,
+          provisionId: parsedParams.data.id,
+        }),
+        getRequestContext(request),
+      );
+
+      return reply.send(provisionResponseSchema.parse({ provision }));
+    });
+
+    app.put('/api/v1/variable-expense-overrides', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const parsedBody = variableExpenseOverrideSchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedBody.error.flatten(),
+        );
+      }
+
+      const override = await financeService.upsertVariableExpenseOverride(
+        authorizedSession.userId,
+        parsedBody.data,
+        getRequestContext(request),
+      );
+
+      return reply.send(
+        variableExpenseOverrideResponseSchema.parse({ override }),
+      );
     });
 
     app.post('/api/v1/accounts/:id/archive', async (request, reply) => {
@@ -754,6 +933,34 @@ export function financeRoutes(financeService: FinanceService): FastifyPluginAsyn
       );
 
       return reply.code(204).send();
+    });
+
+    app.delete('/api/v1/variable-expense-overrides', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const parsedBody = removeVariableExpenseOverrideInputSchema.safeParse(
+        request.body,
+      );
+
+      if (!parsedBody.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedBody.error.flatten(),
+        );
+      }
+
+      const override = await financeService.removeVariableExpenseOverride(
+        authorizedSession.userId,
+        parsedBody.data,
+        getRequestContext(request),
+      );
+
+      return reply.send(
+        variableExpenseOverrideResponseSchema.parse({ override }),
+      );
     });
 
     app.get('/api/v1/horizon', async (request, reply) => {

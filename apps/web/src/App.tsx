@@ -13,6 +13,7 @@ import { CreditCardsPage } from './features/creditCards/CreditCardsPage';
 import { AccessPage } from './features/dashboard/AccessPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { InstallmentsPage } from './features/installments/InstallmentsPage';
+import { ProvisionsPage } from './features/provisions/ProvisionsPage';
 import { TransactionsPage } from './features/transactions/TransactionsPage';
 import { queryClient } from './lib/query-client';
 
@@ -117,6 +118,16 @@ export function App() {
               </ProtectedRoute>
             }
             path="/app/parcelamentos"
+          />
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <ProvisionsPage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+            path="/app/provisoes"
           />
           <Route
             element={

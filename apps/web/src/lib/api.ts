@@ -14,6 +14,7 @@ import type {
   CreateContractAdjustmentInput,
   CreateContractInput,
   CreateInstallmentPlanInput,
+  CreateProvisionInput,
   CreateTransactionInput,
   EndContractInput,
   HorizonSnapshot,
@@ -25,7 +26,11 @@ import type {
   PasswordResetInput,
   PasswordResetRequestInput,
   PasswordResetRequestResult,
+  ProvisionsPlanningSnapshot,
+  ProvisionListItem,
   RegisterInput,
+  RedeemProvisionInput,
+  RemoveVariableExpenseOverrideInput,
   SessionPayload,
   TransactionsSnapshot,
   UpdateAccountInput,
@@ -34,7 +39,11 @@ import type {
   UpdateContractInput,
   UpdateHorizonSettingsInput,
   UpdateInstallmentPlanInput,
+  UpdateProvisionInput,
   UpdateTransactionInput,
+  VariableExpenseOverride,
+  VariableExpenseOverrideListItem,
+  VariableExpenseSnapshot,
 } from '@shf/contracts';
 
 const apiBaseUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
@@ -181,6 +190,20 @@ export const financeApi = {
 
     return payload.snapshot;
   },
+  async getProvisionsSnapshot(): Promise<ProvisionsPlanningSnapshot> {
+    const payload = await request<{ snapshot: ProvisionsPlanningSnapshot }>(
+      '/api/v1/provisions',
+    );
+
+    return payload.snapshot;
+  },
+  async getVariableExpenseSnapshot(): Promise<VariableExpenseSnapshot> {
+    const payload = await request<{ snapshot: VariableExpenseSnapshot }>(
+      '/api/v1/variable-expense-overrides',
+    );
+
+    return payload.snapshot;
+  },
   async updateHorizonSettings(
     input: UpdateHorizonSettingsInput,
   ): Promise<UpdateHorizonSettingsInput> {
@@ -226,6 +249,17 @@ export const financeApi = {
 
     return payload.plan;
   },
+  async createProvision(input: CreateProvisionInput): Promise<ProvisionListItem> {
+    const payload = await request<{ provision: ProvisionListItem }>(
+      '/api/v1/provisions',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+    );
+
+    return payload.provision;
+  },
   async updateCreditCard(input: UpdateCreditCardInput): Promise<CreditCardListItem> {
     const payload = await request<{ creditCard: CreditCardListItem }>(
       `/api/v1/credit-cards/${input.id}`,
@@ -242,6 +276,24 @@ export const financeApi = {
     );
 
     return payload.creditCard;
+  },
+  async updateProvision(input: UpdateProvisionInput): Promise<ProvisionListItem> {
+    const payload = await request<{ provision: ProvisionListItem }>(
+      `/api/v1/provisions/${input.id}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          accountId: input.accountId,
+          category: input.category,
+          description: input.description,
+          startDate: input.startDate,
+          targetAmountInCents: input.targetAmountInCents,
+          targetDate: input.targetDate,
+        }),
+      },
+    );
+
+    return payload.provision;
   },
   async updateInstallmentPlan(
     input: UpdateInstallmentPlanInput,
@@ -289,6 +341,32 @@ export const financeApi = {
     );
 
     return payload.operation;
+  },
+  async redeemProvision(input: RedeemProvisionInput): Promise<ProvisionListItem> {
+    const payload = await request<{ provision: ProvisionListItem }>(
+      `/api/v1/provisions/${input.provisionId}/redeem`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          redeemedAt: input.redeemedAt,
+        }),
+      },
+    );
+
+    return payload.provision;
+  },
+  async upsertVariableExpenseOverride(
+    input: VariableExpenseOverride,
+  ): Promise<VariableExpenseOverrideListItem> {
+    const payload = await request<{ override: VariableExpenseOverrideListItem }>(
+      '/api/v1/variable-expense-overrides',
+      {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      },
+    );
+
+    return payload.override;
   },
   async updateCreditCardPurchase(
     input: UpdateCreditCardPurchaseInput,
@@ -395,5 +473,18 @@ export const financeApi = {
     return request(`/api/v1/transactions/${id}`, {
       method: 'DELETE',
     });
+  },
+  async removeVariableExpenseOverride(
+    input: RemoveVariableExpenseOverrideInput,
+  ): Promise<VariableExpenseOverrideListItem> {
+    const payload = await request<{ override: VariableExpenseOverrideListItem }>(
+      '/api/v1/variable-expense-overrides',
+      {
+        method: 'DELETE',
+        body: JSON.stringify(input),
+      },
+    );
+
+    return payload.override;
   },
 };

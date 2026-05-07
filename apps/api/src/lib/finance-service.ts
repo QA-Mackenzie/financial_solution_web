@@ -22,6 +22,7 @@ import type {
   CreateContractAdjustmentInput,
   CreateContractInput,
   CreateInstallmentPlanInput,
+  CreateProvisionInput,
   CreateTransactionInput,
   EndContractInput,
   HorizonSettings,
@@ -30,20 +31,30 @@ import type {
   InstallmentPlanListItem,
   InstallmentsSnapshot,
   ManualTransaction,
+  ProvisionsPlanningSnapshot,
+  ProvisionListItem,
+  RedeemProvisionInput,
+  RemoveVariableExpenseOverrideInput,
   TransactionsSnapshot,
   UpdateInstallmentAnticipationInput,
   UpdateInstallmentPlanInput,
+  UpdateProvisionInput,
   UpdateCreditCardInput,
   UpdateCreditCardPurchaseInput,
   UpdateContractInput,
   UpdateHorizonSettingsInput,
   UpdateAccountInput,
   UpdateTransactionInput,
+  VariableExpenseOverride,
+  VariableExpenseOverrideListItem,
+  VariableExpenseSnapshot,
 } from '@shf/contracts';
 import {
   buildAccountsSnapshot,
   buildCombinedCreditCardFinancials,
   buildContractsSnapshot,
+  buildProjectedProvisionOccurrences,
+  buildProjectedVariableExpenseOccurrences,
   buildTransactionsSnapshot,
   sanitizeAccountInput,
   sanitizeCreditCardInput,
@@ -51,6 +62,7 @@ import {
   sanitizeContractInput,
   sanitizeInstallmentAnticipationInput,
   sanitizeInstallmentPlanInput,
+  sanitizeProvisionInput,
   sanitizeTransactionInput,
   validateAccountInput,
   validateCreditCardInput,
@@ -58,13 +70,18 @@ import {
   validateContractInput,
   validateInstallmentAnticipationInput,
   validateInstallmentPlanInput,
+  validateProvisionInput,
+  validateProvisionRedeemInput,
   validateTransactionInput,
 } from '@shf/domain-core';
 
 import type { DatabaseClient, DatabaseExecutor } from './database';
 import { AppError } from './errors';
 import { FinancialDataAccess } from './finance-repositories';
-import { buildOfficialHorizonSnapshot } from './horizon-snapshot';
+import {
+  buildOfficialHorizonSnapshot,
+  OFFICIAL_HORIZON_TOTAL_MONTHS,
+} from './horizon-snapshot';
 import { SessionGuard, type AuthorizedSession } from './session-guard';
 
 export type FinanceRequestContext = {
@@ -89,9 +106,15 @@ type FinancialAuditAction =
   | 'INSTALLMENT_ANTICIPATION_UPDATED'
   | 'INSTALLMENT_PLAN_CREATED'
   | 'INSTALLMENT_PLAN_UPDATED'
+  | 'PROVISION_CREATED'
+  | 'PROVISION_REDEEMED'
+  | 'PROVISION_UPDATED'
   | 'TRANSACTION_CREATED'
   | 'TRANSACTION_DELETED'
-  | 'TRANSACTION_UPDATED';
+  | 'TRANSACTION_UPDATED'
+  | 'VARIABLE_EXPENSE_OVERRIDE_CREATED'
+  | 'VARIABLE_EXPENSE_OVERRIDE_REMOVED'
+  | 'VARIABLE_EXPENSE_OVERRIDE_UPDATED';
 
 type FinancialAuditResourceType =
   | 'account'
@@ -100,7 +123,9 @@ type FinancialAuditResourceType =
   | 'installment_operation'
   | 'installment_plan'
   | 'manual_transaction'
-  | 'recurring_contract';
+  | 'provision'
+  | 'recurring_contract'
+  | 'variable_expense_override';
 
 type HorizonCacheEntry = {
   referenceDate: string;
@@ -112,6 +137,125 @@ export type HorizonSnapshotResult = {
   durationInMs: number;
   snapshot: HorizonSnapshot;
 };
+
+type VariableExpenseOverrideValidationIssue = {
+  field: 'accountId' | 'amountInCents' | 'description' | 'occurrenceDate';
+  message: string;
+};
+
+function sanitizeVariableExpenseDescription(value: string): string {
+  return value.trim().replace(/\s+/g, ' ');
+}
+
+function isDateOnly(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const parsedDate = new Date(`${value}T00:00:00.000Z`);
+
+  return (
+    !Number.isNaN(parsedDate.valueOf()) &&
+    parsedDate.toISOString().slice(0, 10) === value
+  );
+}
+
+function sanitizeVariableExpenseOverrideInput<
+  T extends VariableExpenseOverride | RemoveVariableExpenseOverrideInput,
+>(input: T): T {
+  return {
+    ...input,
+    accountId: input.accountId.trim(),
+    description: sanitizeVariableExpenseDescription(input.description),
+    occurrenceDate: input.occurrenceDate.trim(),
+  };
+}
+
+function validateVariableExpenseOverrideInput(
+  input: VariableExpenseOverride,
+): VariableExpenseOverrideValidationIssue[] {
+  const issues: VariableExpenseOverrideValidationIssue[] = [];
+
+  if (!input.accountId) {
+    issues.push({
+      field: 'accountId',
+      message: 'Selecione uma conta para o override de despesa variavel.',
+    });
+  }
+
+  if (!input.description) {
+    issues.push({
+      field: 'description',
+      message: 'Informe uma descricao para a despesa variavel.',
+    });
+  }
+
+  if (input.description.length > 120) {
+    issues.push({
+      field: 'description',
+      message: 'A descricao da despesa variavel deve ter no maximo 120 caracteres.',
+    });
+  }
+
+  if (!isDateOnly(input.occurrenceDate)) {
+    issues.push({
+      field: 'occurrenceDate',
+      message: 'Informe uma data valida no formato AAAA-MM-DD.',
+    });
+  }
+
+  if (
+    !Number.isInteger(input.amountInCents) ||
+    input.amountInCents <= 0
+  ) {
+    issues.push({
+      field: 'amountInCents',
+      message: 'O valor do override deve ser maior que zero em centavos inteiros.',
+    });
+  }
+
+  return issues;
+}
+
+function validateRemoveVariableExpenseOverrideInput(
+  input: RemoveVariableExpenseOverrideInput,
+): VariableExpenseOverrideValidationIssue[] {
+  const issues: VariableExpenseOverrideValidationIssue[] = [];
+
+  if (!input.accountId) {
+    issues.push({
+      field: 'accountId',
+      message: 'Selecione uma conta para remover o override.',
+    });
+  }
+
+  if (!input.description) {
+    issues.push({
+      field: 'description',
+      message: 'Informe a descricao do override a remover.',
+    });
+  }
+
+  if (!isDateOnly(input.occurrenceDate)) {
+    issues.push({
+      field: 'occurrenceDate',
+      message: 'Informe uma data valida no formato AAAA-MM-DD.',
+    });
+  }
+
+  return issues;
+}
+
+function toVariableExpenseOverride(
+  override: VariableExpenseOverrideListItem,
+): VariableExpenseOverride {
+  return {
+    accountId: override.accountId,
+    amountInCents: override.amountInCents,
+    description: override.description,
+    occurrenceDate: override.occurrenceDate,
+  };
+}
 
 export class FinanceService {
   private readonly dataAccess: FinancialDataAccess;
@@ -197,6 +341,48 @@ export class FinanceService {
     );
   }
 
+  async getProvisionsSnapshot(
+    userId: string,
+  ): Promise<ProvisionsPlanningSnapshot> {
+    const referenceDate = this.now().toISOString().slice(0, 10);
+    const snapshot = await this.dataAccess.provisions.getSnapshot(userId);
+
+    return {
+      ...snapshot,
+      projectedOccurrences: buildProjectedProvisionOccurrences(snapshot, {
+        currentDate: referenceDate,
+        totalMonths: OFFICIAL_HORIZON_TOTAL_MONTHS,
+      }),
+    };
+  }
+
+  async getVariableExpenseSnapshot(
+    userId: string,
+  ): Promise<VariableExpenseSnapshot> {
+    const referenceDate = this.now().toISOString().slice(0, 10);
+    const [accountsSnapshot, transactionsSnapshot, settings, overrides] =
+      await Promise.all([
+        this.getAccountsSnapshot(userId),
+        this.listTransactions(userId),
+        this.getHorizonSettings(userId),
+        this.dataAccess.variableExpenseOverrides.listByUserId(userId),
+      ]);
+
+    return {
+      overrides,
+      projectedOccurrences: buildProjectedVariableExpenseOccurrences(
+        accountsSnapshot,
+        transactionsSnapshot,
+        {
+          currentDate: referenceDate,
+          overrides: overrides.map(toVariableExpenseOverride),
+          totalMonths: OFFICIAL_HORIZON_TOTAL_MONTHS,
+          windowInMonths: settings.variableExpenseWindowInMonths,
+        },
+      ),
+    };
+  }
+
   async createAccount(
     userId: string,
     input: CreateAccountInput,
@@ -278,6 +464,48 @@ export class FinanceService {
     this.invalidateHorizonCache(userId);
 
     return contract;
+  }
+
+  async createProvision(
+    userId: string,
+    input: CreateProvisionInput,
+    context: FinanceRequestContext,
+  ): Promise<ProvisionListItem> {
+    const sanitizedInput = sanitizeProvisionInput(input);
+    const issues = validateProvisionInput(sanitizedInput);
+
+    if (issues.length > 0) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', issues);
+    }
+
+    const provision = await this.database.runInTransaction(async (transaction) => {
+      const provision = await this.dataAccess.provisions.create(
+        userId,
+        sanitizedInput,
+        this.now(),
+        transaction,
+      );
+
+      await this.insertAuditEvent(
+        transaction,
+        userId,
+        'provision',
+        provision.id,
+        'PROVISION_CREATED',
+        context,
+        {
+          accountId: provision.accountId,
+          targetAmountInCents: provision.targetAmountInCents,
+          targetDate: provision.targetDate,
+        },
+      );
+
+      return provision;
+    });
+
+    this.invalidateHorizonCache(userId);
+
+    return provision;
   }
 
   async createCreditCard(
@@ -410,6 +638,48 @@ export class FinanceService {
     return creditCard;
   }
 
+  async updateProvision(
+    userId: string,
+    input: UpdateProvisionInput,
+    context: FinanceRequestContext,
+  ): Promise<ProvisionListItem> {
+    const sanitizedInput = sanitizeProvisionInput(input);
+    const issues = validateProvisionInput(sanitizedInput);
+
+    if (issues.length > 0) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', issues);
+    }
+
+    const provision = await this.database.runInTransaction(async (transaction) => {
+      const provision = await this.dataAccess.provisions.update(
+        userId,
+        sanitizedInput,
+        this.now(),
+        transaction,
+      );
+
+      await this.insertAuditEvent(
+        transaction,
+        userId,
+        'provision',
+        provision.id,
+        'PROVISION_UPDATED',
+        context,
+        {
+          accountId: provision.accountId,
+          targetAmountInCents: provision.targetAmountInCents,
+          targetDate: provision.targetDate,
+        },
+      );
+
+      return provision;
+    });
+
+    this.invalidateHorizonCache(userId);
+
+    return provision;
+  }
+
   async updateInstallmentPlan(
     userId: string,
     input: UpdateInstallmentPlanInput,
@@ -493,6 +763,140 @@ export class FinanceService {
     this.invalidateHorizonCache(userId);
 
     return purchase;
+  }
+
+  async redeemProvision(
+    userId: string,
+    input: RedeemProvisionInput,
+    context: FinanceRequestContext,
+  ): Promise<ProvisionListItem> {
+    const issues = validateProvisionRedeemInput(input);
+
+    if (issues.length > 0) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', issues);
+    }
+
+    const provision = await this.database.runInTransaction(async (transaction) => {
+      const provision = await this.dataAccess.provisions.redeem(
+        userId,
+        input,
+        this.now(),
+        transaction,
+      );
+
+      await this.insertAuditEvent(
+        transaction,
+        userId,
+        'provision',
+        provision.id,
+        'PROVISION_REDEEMED',
+        context,
+        {
+          accountId: provision.accountId,
+          redeemedAt: provision.redeemedAt,
+          targetAmountInCents: provision.targetAmountInCents,
+        },
+      );
+
+      return provision;
+    });
+
+    this.invalidateHorizonCache(userId);
+
+    return provision;
+  }
+
+  async upsertVariableExpenseOverride(
+    userId: string,
+    input: VariableExpenseOverride,
+    context: FinanceRequestContext,
+  ): Promise<VariableExpenseOverrideListItem> {
+    const sanitizedInput = sanitizeVariableExpenseOverrideInput(input);
+    const issues = validateVariableExpenseOverrideInput(sanitizedInput);
+
+    if (issues.length > 0) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', issues);
+    }
+
+    const override = await this.database.runInTransaction(async (transaction) => {
+      const previousOverride =
+        await this.dataAccess.variableExpenseOverrides.findByNaturalKey(
+          userId,
+          sanitizedInput,
+          transaction,
+        );
+      const override = await this.dataAccess.variableExpenseOverrides.upsert(
+        userId,
+        sanitizedInput,
+        this.now(),
+        transaction,
+      );
+
+      await this.insertAuditEvent(
+        transaction,
+        userId,
+        'variable_expense_override',
+        override.id,
+        previousOverride
+          ? 'VARIABLE_EXPENSE_OVERRIDE_UPDATED'
+          : 'VARIABLE_EXPENSE_OVERRIDE_CREATED',
+        context,
+        {
+          accountId: override.accountId,
+          amountInCents: override.amountInCents,
+          description: override.description,
+          occurrenceDate: override.occurrenceDate,
+        },
+      );
+
+      return override;
+    });
+
+    this.invalidateHorizonCache(userId);
+
+    return override;
+  }
+
+  async removeVariableExpenseOverride(
+    userId: string,
+    input: RemoveVariableExpenseOverrideInput,
+    context: FinanceRequestContext,
+  ): Promise<VariableExpenseOverrideListItem> {
+    const sanitizedInput = sanitizeVariableExpenseOverrideInput(input);
+    const issues = validateRemoveVariableExpenseOverrideInput(sanitizedInput);
+
+    if (issues.length > 0) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', issues);
+    }
+
+    const override = await this.database.runInTransaction(async (transaction) => {
+      const override = await this.dataAccess.variableExpenseOverrides.remove(
+        userId,
+        sanitizedInput,
+        transaction,
+      );
+
+      await this.insertAuditEvent(
+        transaction,
+        userId,
+        'variable_expense_override',
+        override.id,
+        'VARIABLE_EXPENSE_OVERRIDE_REMOVED',
+        context,
+        {
+          accountId: override.accountId,
+          amountInCents: override.amountInCents,
+          description: override.description,
+          occurrenceDate: override.occurrenceDate,
+        },
+      );
+
+      return override;
+    });
+
+    this.invalidateHorizonCache(userId);
+
+    return override;
   }
 
   async anticipateInstallmentPlan(
@@ -908,12 +1312,22 @@ export class FinanceService {
     }
 
     const settings = await this.getHorizonSettings(userId);
-    const [accountsSnapshot, contractsSnapshot, creditCardsSnapshot, installmentsSnapshot, transactionsSnapshot] = await Promise.all([
+    const [
+      accountsSnapshot,
+      contractsSnapshot,
+      creditCardsSnapshot,
+      installmentsSnapshot,
+      provisionsSnapshot,
+      transactionsSnapshot,
+      variableExpenseOverrides,
+    ] = await Promise.all([
       this.getAccountsSnapshot(userId),
       this.getContractsSnapshot(userId),
       this.getCreditCardsSnapshot(userId),
       this.getInstallmentsSnapshot(userId),
+      this.dataAccess.provisions.getSnapshot(userId),
       this.listTransactions(userId),
+      this.dataAccess.variableExpenseOverrides.listByUserId(userId),
     ]);
     const snapshot = buildOfficialHorizonSnapshot({
       accountsSnapshot,
@@ -921,9 +1335,13 @@ export class FinanceService {
       creditCardsSnapshot,
       generatedAt,
       installmentsSnapshot,
+      provisionsSnapshot,
       referenceDate,
       settings,
       transactionsSnapshot,
+      variableExpenseOverrides: variableExpenseOverrides.map(
+        toVariableExpenseOverride,
+      ),
     });
 
     this.horizonCache.set(userId, {
