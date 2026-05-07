@@ -75,8 +75,9 @@ export function DashboardPage() {
         <h2>Horizonte oficial de 24 meses no backend.</h2>
         <p>
           O horizonte oficial agora combina saldo atual, historico recente e
-          contratos recorrentes com reajustes programados, mantendo a projecao
-          mensal auditavel diretamente no backend.
+          contratos recorrentes com faturas de cartao ja consolidadas por
+          vencimento, mantendo a projecao mensal auditavel diretamente no
+          backend.
         </p>
         <small className="helper-text">
           Ultima geracao:{' '}
@@ -212,8 +213,8 @@ export function DashboardPage() {
       <article className="dashboard-card">
         <h3>Proximas entregas</h3>
         <p>
-          Contratos recorrentes ja alimentam o horizonte automaticamente. O
-          proximo passo evolutivo e ampliar a cobertura para cartoes,
+          Contratos recorrentes e cartoes de credito ja alimentam o horizonte
+          automaticamente. O proximo passo evolutivo e ampliar a cobertura para
           parcelamentos e provisoes dentro do mesmo painel.
         </p>
       </article>

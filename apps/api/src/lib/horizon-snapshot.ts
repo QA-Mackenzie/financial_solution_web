@@ -1,5 +1,6 @@
 import type {
   AccountsSnapshot,
+  CreditCardsSnapshot,
   ContractsSnapshot,
   HorizonSettings,
   HorizonSnapshot,
@@ -7,6 +8,7 @@ import type {
 } from '@shf/contracts';
 import {
   buildFinancialHorizon,
+  buildProjectedCreditCardInvoiceOccurrences,
   buildProjectedContractOccurrences,
   buildProjectedVariableExpenseOccurrences,
 } from '@shf/domain-core';
@@ -15,6 +17,7 @@ export const OFFICIAL_HORIZON_TOTAL_MONTHS = 24;
 
 type BuildOfficialHorizonSnapshotInput = {
   accountsSnapshot: AccountsSnapshot;
+  creditCardsSnapshot: CreditCardsSnapshot;
   contractsSnapshot: ContractsSnapshot;
   generatedAt: string;
   referenceDate: string;
@@ -24,12 +27,18 @@ type BuildOfficialHorizonSnapshotInput = {
 
 export function buildOfficialHorizonSnapshot({
   accountsSnapshot,
+  creditCardsSnapshot,
   contractsSnapshot,
   generatedAt,
   referenceDate,
   settings,
   transactionsSnapshot,
 }: BuildOfficialHorizonSnapshotInput): HorizonSnapshot {
+  const projectedCreditCardInvoiceOccurrences =
+    buildProjectedCreditCardInvoiceOccurrences(
+      creditCardsSnapshot.invoices,
+      referenceDate,
+    );
   const projectedContractOccurrences = buildProjectedContractOccurrences(
     contractsSnapshot,
     {
@@ -48,6 +57,7 @@ export function buildOfficialHorizonSnapshot({
     generatedAt,
     horizon: buildFinancialHorizon(accountsSnapshot, transactionsSnapshot, {
       currentDate: referenceDate,
+      projectedCreditCardInvoiceOccurrences,
       projectedContractOccurrences,
       totalMonths: OFFICIAL_HORIZON_TOTAL_MONTHS,
       safetyMarginInCents: settings.safetyMarginInCents,

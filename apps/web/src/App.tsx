@@ -9,6 +9,7 @@ import { AuthPage } from './features/auth/AuthPage';
 import { PasswordRecoveryPage } from './features/auth/PasswordRecoveryPage';
 import { PasswordResetPage } from './features/auth/PasswordResetPage';
 import { ContractsPage } from './features/contracts/ContractsPage';
+import { CreditCardsPage } from './features/creditCards/CreditCardsPage';
 import { AccessPage } from './features/dashboard/AccessPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { TransactionsPage } from './features/transactions/TransactionsPage';
@@ -95,6 +96,16 @@ export function App() {
               </ProtectedRoute>
             }
             path="/app/contratos"
+          />
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <CreditCardsPage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+            path="/app/cartoes"
           />
           <Route
             element={

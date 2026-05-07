@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   CreateAccountInput,
+  CreateCreditCardInput,
+  CreateCreditCardPurchaseInput,
   CreateContractAdjustmentInput,
   CreateContractInput,
   CreateTransactionInput,
@@ -8,12 +10,15 @@ import type {
   UpdateHorizonSettingsInput,
   UpdateContractInput,
   UpdateAccountInput,
+  UpdateCreditCardInput,
+  UpdateCreditCardPurchaseInput,
   UpdateTransactionInput,
 } from '@shf/contracts';
 
 import { financeApi } from '../../lib/api';
 
 export const accountsSnapshotQueryKey = ['finance', 'accounts', 'snapshot'];
+export const creditCardsSnapshotQueryKey = ['finance', 'credit-cards', 'snapshot'];
 export const contractsSnapshotQueryKey = ['finance', 'contracts', 'snapshot'];
 export const horizonSnapshotQueryKey = ['finance', 'horizon', 'snapshot'];
 export const transactionsSnapshotQueryKey = ['finance', 'transactions', 'snapshot'];
@@ -21,6 +26,7 @@ export const transactionsSnapshotQueryKey = ['finance', 'transactions', 'snapsho
 async function invalidateFinancialQueries(queryClient: ReturnType<typeof useQueryClient>) {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: accountsSnapshotQueryKey }),
+    queryClient.invalidateQueries({ queryKey: creditCardsSnapshotQueryKey }),
     queryClient.invalidateQueries({ queryKey: contractsSnapshotQueryKey }),
     queryClient.invalidateQueries({ queryKey: horizonSnapshotQueryKey }),
     queryClient.invalidateQueries({ queryKey: transactionsSnapshotQueryKey }),
@@ -45,6 +51,13 @@ export function useContractsSnapshotQuery() {
   return useQuery({
     queryFn: financeApi.getContractsSnapshot,
     queryKey: contractsSnapshotQueryKey,
+  });
+}
+
+export function useCreditCardsSnapshotQuery() {
+  return useQuery({
+    queryFn: financeApi.getCreditCardsSnapshot,
+    queryKey: creditCardsSnapshotQueryKey,
   });
 }
 
@@ -96,6 +109,44 @@ export function useCreateContractMutation() {
 
   return useMutation({
     mutationFn: (input: CreateContractInput) => financeApi.createContract(input),
+    onSuccess: async () => invalidateFinancialQueries(queryClient),
+  });
+}
+
+export function useCreateCreditCardMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: CreateCreditCardInput) => financeApi.createCreditCard(input),
+    onSuccess: async () => invalidateFinancialQueries(queryClient),
+  });
+}
+
+export function useUpdateCreditCardMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: UpdateCreditCardInput) => financeApi.updateCreditCard(input),
+    onSuccess: async () => invalidateFinancialQueries(queryClient),
+  });
+}
+
+export function useCreateCreditCardPurchaseMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: CreateCreditCardPurchaseInput) =>
+      financeApi.createCreditCardPurchase(input),
+    onSuccess: async () => invalidateFinancialQueries(queryClient),
+  });
+}
+
+export function useUpdateCreditCardPurchaseMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: UpdateCreditCardPurchaseInput) =>
+      financeApi.updateCreditCardPurchase(input),
     onSuccess: async () => invalidateFinancialQueries(queryClient),
   });
 }

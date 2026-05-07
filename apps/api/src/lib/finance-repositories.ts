@@ -4,10 +4,18 @@ import type {
   ArchiveAccountInput,
   Account,
   AccountListItem,
+  CreditCard,
+  CreditCardInvoice,
+  CreditCardListItem,
+  CreditCardPurchase,
+  CreditCardPurchaseListItem,
+  CreditCardsSnapshot,
   Contract,
   ContractAdjustment,
   ContractListItem,
   CreateAccountInput,
+  CreateCreditCardInput,
+  CreateCreditCardPurchaseInput,
   CreateContractAdjustmentInput,
   CreateContractInput,
   CreateTagInput,
@@ -17,13 +25,22 @@ import type {
   ManualTransaction,
   Tag,
   TagListItem,
+  UpdateCreditCardInput,
+  UpdateCreditCardPurchaseInput,
   UpdateContractInput,
   UpdateAccountInput,
   UpdateTransactionInput,
   TransactionListItem,
 } from '@shf/contracts';
 import {
+  buildCreditCardInvoices,
+  buildCreditCardPurchaseListItems,
+  buildCurrentCreditCardCycle,
+  buildCurrentCreditCardInvoicePreview,
+  buildProjectedCreditCardInvoiceOccurrences,
   sanitizeAccountInput,
+  sanitizeCreditCardInput,
+  sanitizeCreditCardPurchaseInput,
   sanitizeContractInput,
   sanitizeTagIds,
   sanitizeTagInput,
@@ -161,6 +178,37 @@ type ContractAdjustmentRow = QueryResultRow & {
   user_id: string;
 };
 
+type CreditCardRow = QueryResultRow & {
+  created_at: Date | string;
+  credit_limit_in_cents: number | string;
+  due_day: number | string;
+  id: string;
+  name: string;
+  payment_account_id: string;
+  payment_account_name?: string;
+  statement_closing_day: number | string;
+  updated_at: Date | string;
+  user_id: string;
+};
+
+type CreditCardPurchaseRow = QueryResultRow & {
+  amount_in_cents: number | string;
+  category: string | null;
+  created_at: Date | string;
+  credit_card_id: string;
+  credit_card_name?: string;
+  description: string;
+  due_day?: number | string;
+  id: string;
+  payment_account_id?: string;
+  payment_account_name?: string;
+  purchase_date: Date | string;
+  statement_closing_day?: number | string;
+  tag_ids?: string[] | null;
+  updated_at: Date | string;
+  user_id: string;
+};
+
 type LegacyImportBatchRow = QueryResultRow & {
   created_at: Date | string;
   id: string;
@@ -285,6 +333,25 @@ async function assertOwnedContract(
       404,
       'FINANCE_CONTRACT_NOT_FOUND',
       'Contrato nao encontrado para o usuario autenticado.',
+    );
+  }
+}
+
+async function assertOwnedCreditCard(
+  database: DatabaseExecutor,
+  userId: string,
+  creditCardId: string,
+): Promise<void> {
+  const result = await database.query<{ id: string }>(
+    'select id from finance.credit_cards where user_id = $1 and id = $2',
+    [userId, creditCardId],
+  );
+
+  if ((result.rowCount ?? 0) === 0) {
+    throw new AppError(
+      404,
+      'FINANCE_CREDIT_CARD_NOT_FOUND',
+      'Cartao nao encontrado para o usuario autenticado.',
     );
   }
 }
@@ -440,6 +507,143 @@ function mapContractListItem(
   };
 }
 
+function mapCreditCard(row: CreditCardRow): CreditCard {
+  return {
+    createdAt: toIsoString(row.created_at),
+    creditLimitInCents: toNumber(row.credit_limit_in_cents),
+    dueDay: toNumber(row.due_day),
+    id: row.id,
+    name: row.name,
+    paymentAccountId: row.payment_account_id,
+    statementClosingDay: toNumber(row.statement_closing_day),
+    updatedAt: toIsoString(row.updated_at),
+  };
+}
+
+function mapCreditCardPurchase(row: CreditCardPurchaseRow): CreditCardPurchase {
+  const tagIds = (row.tag_ids ?? []).filter(
+    (tagId): tagId is string => typeof tagId === 'string' && tagId.length > 0,
+  );
+
+  return {
+    amountInCents: toNumber(row.amount_in_cents),
+    category: row.category ?? undefined,
+    createdAt: toIsoString(row.created_at),
+    creditCardId: row.credit_card_id,
+    description: row.description,
+    id: row.id,
+    purchaseDate: toDateOnly(row.purchase_date),
+    tagIds: tagIds.length > 0 ? tagIds : undefined,
+    updatedAt: toIsoString(row.updated_at),
+  };
+}
+
+function mapCreditCardBillingCardFromCardRow(
+  row: CreditCardRow,
+): Pick<
+  CreditCardListItem,
+  | 'id'
+  | 'name'
+  | 'statementClosingDay'
+  | 'dueDay'
+  | 'paymentAccountId'
+  | 'paymentAccountName'
+> {
+  return {
+    dueDay: toNumber(row.due_day),
+    id: row.id,
+    name: row.name,
+    paymentAccountId: row.payment_account_id,
+    paymentAccountName: row.payment_account_name ?? '',
+    statementClosingDay: toNumber(row.statement_closing_day),
+  };
+}
+
+function mapCreditCardBillingCardFromPurchaseRow(
+  row: CreditCardPurchaseRow,
+): Pick<
+  CreditCardListItem,
+  | 'id'
+  | 'name'
+  | 'statementClosingDay'
+  | 'dueDay'
+  | 'paymentAccountId'
+  | 'paymentAccountName'
+> {
+  return {
+    dueDay: toNumber(row.due_day),
+    id: row.credit_card_id,
+    name: row.credit_card_name ?? '',
+    paymentAccountId: row.payment_account_id ?? '',
+    paymentAccountName: row.payment_account_name ?? '',
+    statementClosingDay: toNumber(row.statement_closing_day),
+  };
+}
+
+function buildCreditCardsSnapshotFromRows(
+  cardRows: CreditCardRow[],
+  purchaseRows: CreditCardPurchaseRow[],
+  currentDate?: string,
+): CreditCardsSnapshot {
+  if (cardRows.length === 0) {
+    return {
+      cards: [],
+      invoices: [],
+      projectedInvoices: [],
+      purchases: [],
+      totalCreditLimitInCents: 0,
+      totalInvoiceAmountInCents: 0,
+    };
+  }
+
+  const billingCards = cardRows.map(mapCreditCardBillingCardFromCardRow);
+  const purchases = buildCreditCardPurchaseListItems(
+    billingCards,
+    purchaseRows.map(mapCreditCardPurchase),
+  );
+  const invoices = buildCreditCardInvoices(purchases, currentDate);
+  const projectedInvoices = buildProjectedCreditCardInvoiceOccurrences(
+    invoices,
+    currentDate,
+  );
+  const invoicesById = invoices.reduce<Map<string, CreditCardInvoice>>((map, invoice) => {
+    map.set(invoice.id, invoice);
+
+    return map;
+  }, new Map<string, CreditCardInvoice>());
+  const cards = cardRows.map((row) => {
+    const card = mapCreditCard(row);
+    const currentCycle = buildCurrentCreditCardCycle(card, currentDate);
+    const currentInvoicePreview = buildCurrentCreditCardInvoicePreview(card, currentDate);
+
+    return {
+      ...card,
+      currentCycle,
+      currentInvoice: {
+        ...currentInvoicePreview,
+        totalAmountInCents:
+          invoicesById.get(currentInvoicePreview.id)?.totalAmountInCents ?? 0,
+      },
+      paymentAccountName: row.payment_account_name ?? '',
+    } satisfies CreditCardListItem;
+  });
+
+  return {
+    cards,
+    invoices,
+    projectedInvoices,
+    purchases,
+    totalCreditLimitInCents: cards.reduce(
+      (sum, card) => sum + card.creditLimitInCents,
+      0,
+    ),
+    totalInvoiceAmountInCents: invoices.reduce(
+      (sum, invoice) => sum + invoice.totalAmountInCents,
+      0,
+    ),
+  };
+}
+
 function mapTransactionListItem(row: ManualTransactionRow): TransactionListItem {
   const transaction = mapManualTransaction(row);
   const signedAmountInCents =
@@ -510,6 +714,67 @@ function buildManualTransactionsSelect(whereClause: string) {
                    mt.transaction_date,
                    mt.created_at,
                    mt.updated_at,
+                   a.name`;
+}
+
+function buildCreditCardsSelect(whereClause: string) {
+  return `select cc.id,
+                 cc.user_id,
+                 cc.name,
+                 cc.credit_limit_in_cents,
+                 cc.statement_closing_day,
+                 cc.due_day,
+                 cc.payment_account_id,
+                 cc.created_at,
+                 cc.updated_at,
+                 a.name as payment_account_name
+          from finance.credit_cards cc
+          join finance.accounts a
+            on a.user_id = cc.user_id
+           and a.id = cc.payment_account_id
+          ${whereClause}`;
+}
+
+function buildCreditCardPurchasesSelect(whereClause: string) {
+  return `select ccp.id,
+                 ccp.user_id,
+                 ccp.credit_card_id,
+                 ccp.description,
+                 ccp.category,
+                 ccp.amount_in_cents,
+                 ccp.purchase_date,
+                 ccp.created_at,
+                 ccp.updated_at,
+                 cc.name as credit_card_name,
+                 cc.statement_closing_day,
+                 cc.due_day,
+                 cc.payment_account_id,
+                 a.name as payment_account_name,
+                 array_agg(ccpt.tag_id order by ccpt.tag_id) as tag_ids
+          from finance.credit_card_purchases ccp
+          join finance.credit_cards cc
+            on cc.user_id = ccp.user_id
+           and cc.id = ccp.credit_card_id
+          join finance.accounts a
+            on a.user_id = cc.user_id
+           and a.id = cc.payment_account_id
+          left join finance.credit_card_purchase_tags ccpt
+            on ccpt.user_id = ccp.user_id
+           and ccpt.credit_card_purchase_id = ccp.id
+          ${whereClause}
+          group by ccp.id,
+                   ccp.user_id,
+                   ccp.credit_card_id,
+                   ccp.description,
+                   ccp.category,
+                   ccp.amount_in_cents,
+                   ccp.purchase_date,
+                   ccp.created_at,
+                   ccp.updated_at,
+                   cc.name,
+                   cc.statement_closing_day,
+                   cc.due_day,
+                   cc.payment_account_id,
                    a.name`;
 }
 
@@ -1077,6 +1342,429 @@ export class ContractsRepository {
   }
 }
 
+export class CreditCardsRepository {
+  constructor(private readonly database: DatabaseClient) {}
+
+  async create(
+    userId: string,
+    input: CreateCreditCardInput,
+    currentDate: string,
+    now = new Date(),
+    database: DatabaseExecutor = this.database,
+  ): Promise<CreditCardListItem> {
+    const sanitizedInput = sanitizeCreditCardInput(input);
+    const nowIsoString = now.toISOString();
+
+    await assertOwnedAccount(database, userId, sanitizedInput.paymentAccountId);
+
+    await database.query(
+      `insert into finance.credit_cards (
+         id,
+         user_id,
+         name,
+         normalized_name,
+         credit_limit_in_cents,
+         statement_closing_day,
+         due_day,
+         payment_account_id,
+         payload,
+         created_at,
+         updated_at
+       ) values ($1, $2, $3, $4, $5, $6, $7, $8, '{}'::jsonb, $9, $10)`,
+      [
+        randomUUID(),
+        userId,
+        sanitizedInput.name,
+        normalizeName(sanitizedInput.name),
+        sanitizedInput.creditLimitInCents,
+        sanitizedInput.statementClosingDay,
+        sanitizedInput.dueDay,
+        sanitizedInput.paymentAccountId,
+        nowIsoString,
+        nowIsoString,
+      ],
+    );
+
+    const result = await database.query<CreditCardRow>(
+      `${buildCreditCardsSelect('where cc.user_id = $1 and cc.normalized_name = $2')}`,
+      [userId, normalizeName(sanitizedInput.name)],
+    );
+
+    return buildCreditCardsSnapshotFromRows(result.rows, [], currentDate).cards[0]!;
+  }
+
+  async update(
+    userId: string,
+    input: UpdateCreditCardInput,
+    currentDate: string,
+    now = new Date(),
+    database: DatabaseExecutor = this.database,
+  ): Promise<CreditCardListItem> {
+    const sanitizedInput = sanitizeCreditCardInput(input);
+    const nowIsoString = now.toISOString();
+
+    await assertOwnedAccount(database, userId, sanitizedInput.paymentAccountId);
+
+    const result = await database.query(
+      `update finance.credit_cards
+          set name = $3,
+              normalized_name = $4,
+              credit_limit_in_cents = $5,
+              statement_closing_day = $6,
+              due_day = $7,
+              payment_account_id = $8,
+              updated_at = $9
+      where user_id = $1 and id = $2`,
+      [
+        userId,
+        sanitizedInput.id,
+        sanitizedInput.name,
+        normalizeName(sanitizedInput.name),
+        sanitizedInput.creditLimitInCents,
+        sanitizedInput.statementClosingDay,
+        sanitizedInput.dueDay,
+        sanitizedInput.paymentAccountId,
+        nowIsoString,
+      ],
+    );
+
+    if ((result.rowCount ?? 0) === 0) {
+      throw new AppError(
+        404,
+        'FINANCE_CREDIT_CARD_NOT_FOUND',
+        'Cartao nao encontrado para o usuario autenticado.',
+      );
+    }
+
+    const cardRows = await database.query<CreditCardRow>(
+      `${buildCreditCardsSelect('where cc.user_id = $1 and cc.id = $2')}`,
+      [userId, sanitizedInput.id],
+    );
+
+    const purchaseRows = await database.query<CreditCardPurchaseRow>(
+      `${buildCreditCardPurchasesSelect(
+        'where ccp.user_id = $1 and ccp.credit_card_id = $2',
+      )}`,
+      [userId, sanitizedInput.id],
+    );
+
+    return buildCreditCardsSnapshotFromRows(
+      cardRows.rows,
+      purchaseRows.rows,
+      currentDate,
+    ).cards[0]!;
+  }
+
+  async createPurchase(
+    userId: string,
+    input: CreateCreditCardPurchaseInput,
+    now = new Date(),
+    database?: DatabaseExecutor,
+  ): Promise<CreditCardPurchaseListItem> {
+    const sanitizedInput = sanitizeCreditCardPurchaseInput(input);
+    const tagIds = sanitizeTagIds(sanitizedInput.tagIds);
+
+    if (database) {
+      return this.createPurchaseWithinTransaction(
+        database,
+        userId,
+        sanitizedInput,
+        tagIds,
+        now,
+      );
+    }
+
+    return this.database.runInTransaction((transaction) =>
+      this.createPurchaseWithinTransaction(
+        transaction,
+        userId,
+        sanitizedInput,
+        tagIds,
+        now,
+      ),
+    );
+  }
+
+  async updatePurchase(
+    userId: string,
+    input: UpdateCreditCardPurchaseInput,
+    now = new Date(),
+    database?: DatabaseExecutor,
+  ): Promise<CreditCardPurchaseListItem> {
+    const sanitizedInput = sanitizeCreditCardPurchaseInput(input);
+    const tagIds = sanitizeTagIds(sanitizedInput.tagIds);
+
+    if (database) {
+      return this.updatePurchaseWithinTransaction(
+        database,
+        userId,
+        sanitizedInput,
+        tagIds,
+        now,
+      );
+    }
+
+    return this.database.runInTransaction((transaction) =>
+      this.updatePurchaseWithinTransaction(
+        transaction,
+        userId,
+        sanitizedInput,
+        tagIds,
+        now,
+      ),
+    );
+  }
+
+  async findById(
+    userId: string,
+    creditCardId: string,
+    currentDate: string,
+    database: DatabaseExecutor = this.database,
+  ): Promise<CreditCardListItem | null> {
+    const cardRows = await database.query<CreditCardRow>(
+      `${buildCreditCardsSelect('where cc.user_id = $1 and cc.id = $2')}`,
+      [userId, creditCardId],
+    );
+
+    if (cardRows.rows.length === 0) {
+      return null;
+    }
+
+    const purchaseRows = await database.query<CreditCardPurchaseRow>(
+      `${buildCreditCardPurchasesSelect(
+        'where ccp.user_id = $1 and ccp.credit_card_id = $2',
+      )}`,
+      [userId, creditCardId],
+    );
+
+    return buildCreditCardsSnapshotFromRows(
+      cardRows.rows,
+      purchaseRows.rows,
+      currentDate,
+    ).cards[0] ?? null;
+  }
+
+  async findPurchaseById(
+    userId: string,
+    purchaseId: string,
+  ): Promise<CreditCardPurchaseListItem | null> {
+    const result = await this.database.query<CreditCardPurchaseRow>(
+      `${buildCreditCardPurchasesSelect('where ccp.user_id = $1 and ccp.id = $2')}`,
+      [userId, purchaseId],
+    );
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    const purchase = result.rows[0]!;
+
+    return buildCreditCardPurchaseListItems(
+      [mapCreditCardBillingCardFromPurchaseRow(purchase)],
+      [mapCreditCardPurchase(purchase)],
+    )[0] ?? null;
+  }
+
+  async listByUserId(userId: string, currentDate: string): Promise<CreditCardListItem[]> {
+    const snapshot = await this.getSnapshot(userId, currentDate);
+
+    return snapshot.cards;
+  }
+
+  async listPurchasesByUserId(userId: string): Promise<CreditCardPurchaseListItem[]> {
+    const result = await this.database.query<CreditCardPurchaseRow>(
+      `${buildCreditCardPurchasesSelect('where ccp.user_id = $1')}
+       order by ccp.purchase_date desc, ccp.created_at desc`,
+      [userId],
+    );
+
+    if (result.rows.length === 0) {
+      return [];
+    }
+
+    const cardsById = result.rows.reduce<
+      Map<
+        string,
+        Pick<
+          CreditCardListItem,
+          | 'id'
+          | 'name'
+          | 'statementClosingDay'
+          | 'dueDay'
+          | 'paymentAccountId'
+          | 'paymentAccountName'
+        >
+      >
+    >((map, row) => {
+      map.set(row.credit_card_id, mapCreditCardBillingCardFromPurchaseRow(row));
+
+      return map;
+    }, new Map());
+
+    return buildCreditCardPurchaseListItems(
+      [...cardsById.values()],
+      result.rows.map(mapCreditCardPurchase),
+    );
+  }
+
+  async getSnapshot(userId: string, currentDate: string): Promise<CreditCardsSnapshot> {
+    const [cardRows, purchaseRows] = await Promise.all([
+      this.database.query<CreditCardRow>(
+        `${buildCreditCardsSelect('where cc.user_id = $1')}
+         order by cc.name asc`,
+        [userId],
+      ),
+      this.database.query<CreditCardPurchaseRow>(
+        `${buildCreditCardPurchasesSelect('where ccp.user_id = $1')}
+         order by ccp.purchase_date desc, ccp.created_at desc`,
+        [userId],
+      ),
+    ]);
+
+    return buildCreditCardsSnapshotFromRows(
+      cardRows.rows,
+      purchaseRows.rows,
+      currentDate,
+    );
+  }
+
+  private async createPurchaseWithinTransaction(
+    transaction: DatabaseExecutor,
+    userId: string,
+    sanitizedInput: CreateCreditCardPurchaseInput,
+    tagIds: readonly string[],
+    now: Date,
+  ): Promise<CreditCardPurchaseListItem> {
+    await assertOwnedCreditCard(transaction, userId, sanitizedInput.creditCardId);
+    await assertOwnedTags(transaction, userId, tagIds);
+
+    const purchaseId = randomUUID();
+    const nowIsoString = now.toISOString();
+    await transaction.query(
+      `insert into finance.credit_card_purchases (
+         id,
+         user_id,
+         credit_card_id,
+         description,
+         category,
+         amount_in_cents,
+         purchase_date,
+         installment_count,
+         payload,
+         created_at,
+         updated_at
+       ) values ($1, $2, $3, $4, $5, $6, $7, 1, '{}'::jsonb, $8, $9)`,
+      [
+        purchaseId,
+        userId,
+        sanitizedInput.creditCardId,
+        sanitizedInput.description,
+        sanitizedInput.category ?? null,
+        sanitizedInput.amountInCents,
+        sanitizedInput.purchaseDate,
+        nowIsoString,
+        nowIsoString,
+      ],
+    );
+
+    for (const tagId of tagIds) {
+      await transaction.query(
+        `insert into finance.credit_card_purchase_tags (
+           user_id,
+           credit_card_purchase_id,
+           tag_id,
+           created_at
+         ) values ($1, $2, $3, $4)`,
+        [userId, purchaseId, tagId, nowIsoString],
+      );
+    }
+
+    const created = await transaction.query<CreditCardPurchaseRow>(
+      `${buildCreditCardPurchasesSelect('where ccp.user_id = $1 and ccp.id = $2')}`,
+      [userId, purchaseId],
+    );
+    const createdPurchase = created.rows[0]!;
+
+    return buildCreditCardPurchaseListItems(
+      [mapCreditCardBillingCardFromPurchaseRow(createdPurchase)],
+      [mapCreditCardPurchase(createdPurchase)],
+    )[0]!;
+  }
+
+  private async updatePurchaseWithinTransaction(
+    transaction: DatabaseExecutor,
+    userId: string,
+    sanitizedInput: UpdateCreditCardPurchaseInput,
+    tagIds: readonly string[],
+    now: Date,
+  ): Promise<CreditCardPurchaseListItem> {
+    const existing = await transaction.query<{ id: string }>(
+      'select id from finance.credit_card_purchases where user_id = $1 and id = $2',
+      [userId, sanitizedInput.id],
+    );
+
+    if ((existing.rowCount ?? 0) === 0) {
+      throw new AppError(
+        404,
+        'FINANCE_CREDIT_CARD_PURCHASE_NOT_FOUND',
+        'Compra no cartao nao encontrada para o usuario autenticado.',
+      );
+    }
+
+    await assertOwnedCreditCard(transaction, userId, sanitizedInput.creditCardId);
+    await assertOwnedTags(transaction, userId, tagIds);
+
+    await transaction.query(
+      `update finance.credit_card_purchases
+          set credit_card_id = $3,
+              description = $4,
+              category = $5,
+              amount_in_cents = $6,
+              purchase_date = $7,
+              updated_at = $8
+        where user_id = $1 and id = $2`,
+      [
+        userId,
+        sanitizedInput.id,
+        sanitizedInput.creditCardId,
+        sanitizedInput.description,
+        sanitizedInput.category ?? null,
+        sanitizedInput.amountInCents,
+        sanitizedInput.purchaseDate,
+        now.toISOString(),
+      ],
+    );
+
+    await transaction.query(
+      'delete from finance.credit_card_purchase_tags where user_id = $1 and credit_card_purchase_id = $2',
+      [userId, sanitizedInput.id],
+    );
+
+    for (const tagId of tagIds) {
+      await transaction.query(
+        `insert into finance.credit_card_purchase_tags (
+           user_id,
+           credit_card_purchase_id,
+           tag_id,
+           created_at
+         ) values ($1, $2, $3, $4)`,
+        [userId, sanitizedInput.id, tagId, now.toISOString()],
+      );
+    }
+
+    const updated = await transaction.query<CreditCardPurchaseRow>(
+      `${buildCreditCardPurchasesSelect('where ccp.user_id = $1 and ccp.id = $2')}`,
+      [userId, sanitizedInput.id],
+    );
+    const updatedPurchase = updated.rows[0]!;
+
+    return buildCreditCardPurchaseListItems(
+      [mapCreditCardBillingCardFromPurchaseRow(updatedPurchase)],
+      [mapCreditCardPurchase(updatedPurchase)],
+    )[0]!;
+  }
+}
+
 export class TagsRepository {
   constructor(private readonly database: DatabaseClient) {}
 
@@ -1553,6 +2241,8 @@ export class LegacyImportRepository {
 export class FinancialDataAccess {
   readonly accounts: AccountsRepository;
 
+  readonly creditCards: CreditCardsRepository;
+
   readonly contracts: ContractsRepository;
 
   readonly legacyImport: LegacyImportRepository;
@@ -1565,6 +2255,7 @@ export class FinancialDataAccess {
 
   constructor(database: DatabaseClient) {
     this.accounts = new AccountsRepository(database);
+    this.creditCards = new CreditCardsRepository(database);
     this.contracts = new ContractsRepository(database);
     this.legacyImport = new LegacyImportRepository(database);
     this.manualTransactions = new ManualTransactionsRepository(database);

@@ -432,6 +432,8 @@ Receitas e despesas recorrentes passam a ser calculadas automaticamente na web c
 
 ## Sprint 6 - Cartoes de credito e faturas
 
+Status: concluida em 2026-05-07
+
 ### Objetivo
 
 Separar corretamente credito e caixa no sistema web, incluindo compras, ciclo de fatura e vencimento.
@@ -444,20 +446,57 @@ Separar corretamente credito e caixa no sistema web, incluindo compras, ciclo de
 
 ### Backlog recomendado
 
-- [ ] Implementar schema e endpoints de cartoes e compras no credito
-- [ ] Portar creditCardInput, creditCardPurchaseInput e creditCardBilling
-- [ ] Implementar preview de fatura, fechamento, vencimento e conta pagadora padrao
-- [ ] Integrar o debito consolidado da fatura ao horizonte no mes correto
-- [ ] Criar UI de cartoes com cadastro, compra, visao de fatura e historico
-- [ ] Criar validacoes para ciclo de fechamento, limite e datas invalidas
-- [ ] Criar testes de regressao com compras em datas proximas ao fechamento
-- [ ] Criar E2E cobrindo compra no cartao e reflexo apenas no vencimento
-- [ ] Adicionar eventos de auditoria para criacao de compra, alteracao de cartao e fechamento de fatura
-- [ ] Medir impacto de performance do calculo de billing sobre o horizonte agregado
+- [x] Implementar schema e endpoints de cartoes e compras no credito
+- [x] Portar creditCardInput, creditCardPurchaseInput e creditCardBilling
+- [x] Implementar preview de fatura, fechamento, vencimento e conta pagadora padrao
+- [x] Integrar o debito consolidado da fatura ao horizonte no mes correto
+- [x] Criar UI de cartoes com cadastro, compra, visao de fatura e historico
+- [x] Criar validacoes para ciclo de fechamento, limite e datas invalidas
+- [x] Criar testes de regressao com compras em datas proximas ao fechamento
+- [x] Criar E2E na shell web cobrindo compra no cartao e reflexo apenas no vencimento
+- [x] Adicionar eventos de auditoria para criacao e alteracao do modulo; fechamento da fatura permanece derivado pelo billing
+- [x] Medir impacto de performance do calculo de billing sobre o horizonte agregado
 
 ### Gate de saida
 
 O sistema web representa credito sem distorcer o caixa atual e sem perder equivalencia com a regra financeira do desktop.
+
+### Implementado nesta sprint
+
+- contracts compartilhados expandidos com schemas Zod e tipos para cartoes, compras, faturas, ciclos, snapshots e payloads de criacao/edicao
+- reuso direto do dominio puro em packages/domain-core para validacao de cartao/compra, classificacao de ciclo, preview de fatura e projecao das ocorrencias no horizonte
+- CreditCardsRepository owner-scoped, FinanceService e rotas financeiras da API atualizados com create, update, list, purchases, auditoria e bloqueio cross-user
+- horizonte oficial do backend passou a considerar o debito agregado da fatura apenas no vencimento da conta pagadora, preservando o caixa no dia da compra
+- testes HTTP e de regressao da API cobrindo fechamento proximo da fatura, meses corretos de vencimento, auditoria e isolamento por usuario
+- cliente web atualizado com endpoints e hooks React Query de cartoes, nova pagina protegida de cartoes, navegacao dedicada e historico de compras/faturas
+- teste da shell web cobrindo cadastrar cartao, criar compra antes e depois do fechamento, editar dados e validar o reflexo apenas nos meses de vencimento
+- configuracoes do Vitest e do Vite no app web migradas para .mts para compatibilidade ESM do toolchain atual
+
+### Cartoes no horizonte oficial
+
+- compras no credito nao reduzem o caixa no dia da compra; o impacto consolidado entra apenas no mes do vencimento da fatura
+- compras em datas proximas ao fechamento passam corretamente para a fatura seguinte quando o ciclo ja encerrou
+- cada cartao mantem conta pagadora padrao, ciclo atual, preview da fatura corrente e historico consolidado por invoiceMonth
+
+### Performance observada
+
+- benchmark sintetico executado sobre 200 cartoes, 6000 compras, 1116 faturas geradas e horizonte de 24 meses concluiu billing + projecao agregada em 163.61 ms
+
+### Validacao executada
+
+- npm run test --workspace @shf/api -- credit-card-routes.test.ts horizon-projection.test.ts
+- npm run test --workspace @shf/web -- App.test.tsx
+- npm run test --workspace @shf/api
+- npm run test --workspace @shf/web
+- npm run typecheck --workspace @shf/web
+- npm run check ate o build do frontend, com lint, typecheck e testes completos aprovados no workspace
+- build do frontend validado com Node 20 via npx --yes node@20 ../../node_modules/typescript/bin/tsc --project tsconfig.json e npx --yes node@20 ../../node_modules/vite/bin/vite.js build --config vite.config.mts em apps/web
+
+### Observacoes de ambiente
+
+- npm run check nao concluiu o build web com o Node global 18.20.8 da maquina, porque o Vite 7 instalado exige Node 20.19+ ou 22.12+
+- npm run infra:up falhou porque o Docker Desktop nao estava disponivel no Windows no momento da validacao
+- npm run db:check retornou status down sem Postgres local ativo
 
 ---
 

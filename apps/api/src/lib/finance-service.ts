@@ -9,10 +9,15 @@ import type {
   AccountListItem,
   AccountsSnapshot,
   ArchiveAccountInput,
+  CreditCardListItem,
+  CreditCardPurchaseListItem,
+  CreditCardsSnapshot,
   Contract,
   ContractAdjustment,
   ContractsSnapshot,
   CreateAccountInput,
+  CreateCreditCardInput,
+  CreateCreditCardPurchaseInput,
   CreateContractAdjustmentInput,
   CreateContractInput,
   CreateTransactionInput,
@@ -21,6 +26,8 @@ import type {
   HorizonSnapshot,
   ManualTransaction,
   TransactionsSnapshot,
+  UpdateCreditCardInput,
+  UpdateCreditCardPurchaseInput,
   UpdateContractInput,
   UpdateHorizonSettingsInput,
   UpdateAccountInput,
@@ -31,9 +38,13 @@ import {
   buildContractsSnapshot,
   buildTransactionsSnapshot,
   sanitizeAccountInput,
+  sanitizeCreditCardInput,
+  sanitizeCreditCardPurchaseInput,
   sanitizeContractInput,
   sanitizeTransactionInput,
   validateAccountInput,
+  validateCreditCardInput,
+  validateCreditCardPurchaseInput,
   validateContractInput,
   validateTransactionInput,
 } from '@shf/domain-core';
@@ -54,6 +65,10 @@ type FinancialAuditAction =
   | 'ACCOUNT_ARCHIVED'
   | 'ACCOUNT_CREATED'
   | 'ACCOUNT_UPDATED'
+  | 'CREDIT_CARD_CREATED'
+  | 'CREDIT_CARD_PURCHASE_CREATED'
+  | 'CREDIT_CARD_PURCHASE_UPDATED'
+  | 'CREDIT_CARD_UPDATED'
   | 'CONTRACT_ADJUSTED'
   | 'CONTRACT_CREATED'
   | 'CONTRACT_ENDED'
@@ -64,6 +79,8 @@ type FinancialAuditAction =
 
 type FinancialAuditResourceType =
   | 'account'
+  | 'credit_card'
+  | 'credit_card_purchase'
   | 'manual_transaction'
   | 'recurring_contract';
 
@@ -130,6 +147,13 @@ export class FinanceService {
     return buildContractsSnapshot(contracts, {
       currentDate: this.now().toISOString().slice(0, 10),
     });
+  }
+
+  async getCreditCardsSnapshot(userId: string): Promise<CreditCardsSnapshot> {
+    return this.dataAccess.creditCards.getSnapshot(
+      userId,
+      this.now().toISOString().slice(0, 10),
+    );
   }
 
   async createAccount(
@@ -213,6 +237,180 @@ export class FinanceService {
     this.invalidateHorizonCache(userId);
 
     return contract;
+  }
+
+  async createCreditCard(
+    userId: string,
+    input: CreateCreditCardInput,
+    context: FinanceRequestContext,
+  ): Promise<CreditCardListItem> {
+    const sanitizedInput = sanitizeCreditCardInput(input);
+    const issues = validateCreditCardInput(sanitizedInput);
+
+    if (issues.length > 0) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', issues);
+    }
+
+    const currentDate = this.now().toISOString().slice(0, 10);
+    const creditCard = await this.database.runInTransaction(async (transaction) => {
+      const creditCard = await this.dataAccess.creditCards.create(
+        userId,
+        sanitizedInput,
+        currentDate,
+        this.now(),
+        transaction,
+      );
+
+      await this.insertAuditEvent(
+        transaction,
+        userId,
+        'credit_card',
+        creditCard.id,
+        'CREDIT_CARD_CREATED',
+        context,
+        {
+          dueDay: creditCard.dueDay,
+          paymentAccountId: creditCard.paymentAccountId,
+          statementClosingDay: creditCard.statementClosingDay,
+        },
+      );
+
+      return creditCard;
+    });
+
+    this.invalidateHorizonCache(userId);
+
+    return creditCard;
+  }
+
+  async updateCreditCard(
+    userId: string,
+    input: UpdateCreditCardInput,
+    context: FinanceRequestContext,
+  ): Promise<CreditCardListItem> {
+    const sanitizedInput = sanitizeCreditCardInput(input);
+    const issues = validateCreditCardInput(sanitizedInput);
+
+    if (issues.length > 0) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', issues);
+    }
+
+    const currentDate = this.now().toISOString().slice(0, 10);
+    const creditCard = await this.database.runInTransaction(async (transaction) => {
+      const creditCard = await this.dataAccess.creditCards.update(
+        userId,
+        sanitizedInput,
+        currentDate,
+        this.now(),
+        transaction,
+      );
+
+      await this.insertAuditEvent(
+        transaction,
+        userId,
+        'credit_card',
+        creditCard.id,
+        'CREDIT_CARD_UPDATED',
+        context,
+        {
+          dueDay: creditCard.dueDay,
+          paymentAccountId: creditCard.paymentAccountId,
+          statementClosingDay: creditCard.statementClosingDay,
+        },
+      );
+
+      return creditCard;
+    });
+
+    this.invalidateHorizonCache(userId);
+
+    return creditCard;
+  }
+
+  async createCreditCardPurchase(
+    userId: string,
+    input: CreateCreditCardPurchaseInput,
+    context: FinanceRequestContext,
+  ): Promise<CreditCardPurchaseListItem> {
+    const sanitizedInput = sanitizeCreditCardPurchaseInput(input);
+    const issues = validateCreditCardPurchaseInput(sanitizedInput);
+
+    if (issues.length > 0) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', issues);
+    }
+
+    const purchase = await this.database.runInTransaction(async (transaction) => {
+      const purchase = await this.dataAccess.creditCards.createPurchase(
+        userId,
+        sanitizedInput,
+        this.now(),
+        transaction,
+      );
+
+      await this.insertAuditEvent(
+        transaction,
+        userId,
+        'credit_card_purchase',
+        purchase.id,
+        'CREDIT_CARD_PURCHASE_CREATED',
+        context,
+        {
+          amountInCents: purchase.amountInCents,
+          creditCardId: purchase.creditCardId,
+          invoiceMonth: purchase.invoiceMonth,
+          purchaseDate: purchase.purchaseDate,
+        },
+      );
+
+      return purchase;
+    });
+
+    this.invalidateHorizonCache(userId);
+
+    return purchase;
+  }
+
+  async updateCreditCardPurchase(
+    userId: string,
+    input: UpdateCreditCardPurchaseInput,
+    context: FinanceRequestContext,
+  ): Promise<CreditCardPurchaseListItem> {
+    const sanitizedInput = sanitizeCreditCardPurchaseInput(input);
+    const issues = validateCreditCardPurchaseInput(sanitizedInput);
+
+    if (issues.length > 0) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Dados invalidos.', issues);
+    }
+
+    const purchase = await this.database.runInTransaction(async (transaction) => {
+      const purchase = await this.dataAccess.creditCards.updatePurchase(
+        userId,
+        sanitizedInput,
+        this.now(),
+        transaction,
+      );
+
+      await this.insertAuditEvent(
+        transaction,
+        userId,
+        'credit_card_purchase',
+        purchase.id,
+        'CREDIT_CARD_PURCHASE_UPDATED',
+        context,
+        {
+          amountInCents: purchase.amountInCents,
+          creditCardId: purchase.creditCardId,
+          invoiceMonth: purchase.invoiceMonth,
+          purchaseDate: purchase.purchaseDate,
+        },
+      );
+
+      return purchase;
+    });
+
+    this.invalidateHorizonCache(userId);
+
+    return purchase;
   }
 
   async updateContract(
@@ -500,14 +698,16 @@ export class FinanceService {
     }
 
     const settings = await this.getHorizonSettings(userId);
-    const [accountsSnapshot, contractsSnapshot, transactionsSnapshot] = await Promise.all([
+    const [accountsSnapshot, contractsSnapshot, creditCardsSnapshot, transactionsSnapshot] = await Promise.all([
       this.getAccountsSnapshot(userId),
       this.getContractsSnapshot(userId),
+      this.getCreditCardsSnapshot(userId),
       this.listTransactions(userId),
     ]);
     const snapshot = buildOfficialHorizonSnapshot({
       accountsSnapshot,
       contractsSnapshot,
+      creditCardsSnapshot,
       generatedAt,
       referenceDate,
       settings,
