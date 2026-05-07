@@ -483,6 +483,31 @@ button {
   color: #ffd3c7;
 }
 
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 108px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.status-pill-accent {
+  background: rgba(255, 203, 119, 0.18);
+  color: #ffe3a8;
+}
+
+.status-pill-success {
+  background: rgba(155, 231, 167, 0.18);
+  color: #b8f5c0;
+}
+
+.status-pill-muted {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(245, 241, 232, 0.82);
+}
+
 .screen-message {
   display: grid;
   min-height: 100vh;

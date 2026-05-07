@@ -555,4 +555,134 @@ describe('buildOfficialHorizonSnapshot', () => {
       30000,
     ]);
   });
+
+  it('aplica override manual de despesa variavel e reserva de provisao no horizonte oficial', () => {
+    const settings = {
+      safetyMarginInCents: DEFAULT_HORIZON_SAFETY_MARGIN_IN_CENTS,
+      variableExpenseWindowInMonths: DEFAULT_VARIABLE_EXPENSE_WINDOW_IN_MONTHS,
+    };
+
+    const snapshot = buildOfficialHorizonSnapshot({
+      accountsSnapshot: {
+        activeAccounts: [
+          {
+            id: 'checking',
+            name: 'Conta principal',
+            type: 'checking',
+            openingBalanceInCents: 200000,
+            currentBalanceInCents: 164000,
+            isArchived: false,
+            archivedAt: null,
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-05-01T00:00:00.000Z',
+          },
+        ],
+        archivedAccounts: [],
+        consolidatedBalanceInCents: 164000,
+      },
+      creditCardsSnapshot: emptyCreditCardsSnapshot,
+      contractsSnapshot: emptyContractsSnapshot,
+      generatedAt: '2026-05-01T12:00:00.000Z',
+      installmentsSnapshot: emptyInstallmentsSnapshot,
+      provisionsSnapshot: {
+        activeProvisions: [
+          {
+            id: 'prov-1',
+            accountId: 'checking',
+            accountName: 'Conta principal',
+            description: 'Seguro anual',
+            category: 'Casa',
+            targetAmountInCents: 90000,
+            startDate: '2026-05-05',
+            targetDate: '2026-08-10',
+            status: 'active',
+            redeemedAt: null,
+            createdAt: '2026-05-01T00:00:00.000Z',
+            updatedAt: '2026-05-01T00:00:00.000Z',
+          },
+        ],
+        redeemedProvisions: [],
+        totalActiveTargetAmountInCents: 90000,
+      },
+      referenceDate: '2026-05-01',
+      settings,
+      transactionsSnapshot: {
+        totalIncomeInCents: 0,
+        totalExpenseInCents: 36000,
+        transactions: [
+          {
+            id: 'tx-1',
+            accountId: 'checking',
+            accountName: 'Conta principal',
+            amountInCents: 10000,
+            signedAmountInCents: -10000,
+            category: 'Mercado',
+            description: 'Supermercado',
+            transactionDate: '2026-02-10',
+            type: 'expense',
+            createdAt: '2026-02-10T12:00:00.000Z',
+            updatedAt: '2026-02-10T12:00:00.000Z',
+          },
+          {
+            id: 'tx-2',
+            accountId: 'checking',
+            accountName: 'Conta principal',
+            amountInCents: 12000,
+            signedAmountInCents: -12000,
+            category: 'Mercado',
+            description: 'Supermercado',
+            transactionDate: '2026-03-10',
+            type: 'expense',
+            createdAt: '2026-03-10T12:00:00.000Z',
+            updatedAt: '2026-03-10T12:00:00.000Z',
+          },
+          {
+            id: 'tx-3',
+            accountId: 'checking',
+            accountName: 'Conta principal',
+            amountInCents: 14000,
+            signedAmountInCents: -14000,
+            category: 'Mercado',
+            description: 'Supermercado',
+            transactionDate: '2026-04-10',
+            type: 'expense',
+            createdAt: '2026-04-10T12:00:00.000Z',
+            updatedAt: '2026-04-10T12:00:00.000Z',
+          },
+        ],
+      },
+      variableExpenseOverrides: [
+        {
+          accountId: 'checking',
+          description: 'Supermercado',
+          occurrenceDate: '2026-06-10',
+          amountInCents: 18500,
+        },
+      ],
+    });
+
+    expect(snapshot.horizon.months[0]).toMatchObject({
+      monthStart: '2026-05-01',
+      cashOpeningBalanceInCents: 164000,
+      cashClosingBalanceInCents: 164000,
+      openingBalanceInCents: 164000,
+      closingBalanceInCents: 134000,
+      provisionAllocationInCents: 30000,
+      provisionReservedBalanceInCents: 30000,
+    });
+    expect(snapshot.horizon.months[1]).toMatchObject({
+      monthStart: '2026-06-01',
+      expenseInCents: 18500,
+      cashClosingBalanceInCents: 145500,
+      closingBalanceInCents: 85500,
+      provisionAllocationInCents: 30000,
+      provisionReservedBalanceInCents: 60000,
+    });
+    expect(snapshot.horizon.months[2]).toMatchObject({
+      monthStart: '2026-07-01',
+      expenseInCents: 12000,
+      provisionAllocationInCents: 30000,
+      provisionReservedBalanceInCents: 90000,
+    });
+  });
 });

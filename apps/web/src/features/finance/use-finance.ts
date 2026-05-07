@@ -7,15 +7,20 @@ import type {
   CreateContractAdjustmentInput,
   CreateContractInput,
   CreateInstallmentPlanInput,
+  CreateProvisionInput,
   CreateTransactionInput,
   EndContractInput,
+  RedeemProvisionInput,
+  RemoveVariableExpenseOverrideInput,
   UpdateHorizonSettingsInput,
   UpdateContractInput,
   UpdateAccountInput,
   UpdateCreditCardInput,
   UpdateCreditCardPurchaseInput,
   UpdateInstallmentPlanInput,
+  UpdateProvisionInput,
   UpdateTransactionInput,
+  VariableExpenseOverride,
 } from '@shf/contracts';
 
 import { financeApi } from '../../lib/api';
@@ -25,7 +30,13 @@ export const creditCardsSnapshotQueryKey = ['finance', 'credit-cards', 'snapshot
 export const contractsSnapshotQueryKey = ['finance', 'contracts', 'snapshot'];
 export const horizonSnapshotQueryKey = ['finance', 'horizon', 'snapshot'];
 export const installmentsSnapshotQueryKey = ['finance', 'installments', 'snapshot'];
+export const provisionsSnapshotQueryKey = ['finance', 'provisions', 'snapshot'];
 export const transactionsSnapshotQueryKey = ['finance', 'transactions', 'snapshot'];
+export const variableExpenseSnapshotQueryKey = [
+  'finance',
+  'variable-expense',
+  'snapshot',
+];
 
 async function invalidateFinancialQueries(queryClient: ReturnType<typeof useQueryClient>) {
   await Promise.all([
@@ -34,7 +45,9 @@ async function invalidateFinancialQueries(queryClient: ReturnType<typeof useQuer
     queryClient.invalidateQueries({ queryKey: contractsSnapshotQueryKey }),
     queryClient.invalidateQueries({ queryKey: horizonSnapshotQueryKey }),
     queryClient.invalidateQueries({ queryKey: installmentsSnapshotQueryKey }),
+    queryClient.invalidateQueries({ queryKey: provisionsSnapshotQueryKey }),
     queryClient.invalidateQueries({ queryKey: transactionsSnapshotQueryKey }),
+    queryClient.invalidateQueries({ queryKey: variableExpenseSnapshotQueryKey }),
   ]);
 }
 
@@ -70,6 +83,20 @@ export function useInstallmentsSnapshotQuery() {
   return useQuery({
     queryFn: financeApi.getInstallmentsSnapshot,
     queryKey: installmentsSnapshotQueryKey,
+  });
+}
+
+export function useProvisionsSnapshotQuery() {
+  return useQuery({
+    queryFn: financeApi.getProvisionsSnapshot,
+    queryKey: provisionsSnapshotQueryKey,
+  });
+}
+
+export function useVariableExpenseSnapshotQuery() {
+  return useQuery({
+    queryFn: financeApi.getVariableExpenseSnapshot,
+    queryKey: variableExpenseSnapshotQueryKey,
   });
 }
 
@@ -245,6 +272,53 @@ export function useAnticipateInstallmentPlanMutation() {
   return useMutation({
     mutationFn: (input: AnticipateInstallmentPlanInput) =>
       financeApi.anticipateInstallmentPlan(input),
+    onSuccess: async () => invalidateFinancialQueries(queryClient),
+  });
+}
+
+export function useCreateProvisionMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: CreateProvisionInput) => financeApi.createProvision(input),
+    onSuccess: async () => invalidateFinancialQueries(queryClient),
+  });
+}
+
+export function useUpdateProvisionMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: UpdateProvisionInput) => financeApi.updateProvision(input),
+    onSuccess: async () => invalidateFinancialQueries(queryClient),
+  });
+}
+
+export function useRedeemProvisionMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: RedeemProvisionInput) => financeApi.redeemProvision(input),
+    onSuccess: async () => invalidateFinancialQueries(queryClient),
+  });
+}
+
+export function useUpsertVariableExpenseOverrideMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: VariableExpenseOverride) =>
+      financeApi.upsertVariableExpenseOverride(input),
+    onSuccess: async () => invalidateFinancialQueries(queryClient),
+  });
+}
+
+export function useRemoveVariableExpenseOverrideMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: RemoveVariableExpenseOverrideInput) =>
+      financeApi.removeVariableExpenseOverride(input),
     onSuccess: async () => invalidateFinancialQueries(queryClient),
   });
 }

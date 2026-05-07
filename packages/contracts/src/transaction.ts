@@ -51,6 +51,57 @@ export const deleteTransactionInputSchema = z.object({
   id: z.string().uuid(),
 });
 
+export const variableExpenseOverrideSchema = z.object({
+  accountId: z.string().uuid(),
+  description: z.string().min(1).max(120),
+  occurrenceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  amountInCents: z.number().int().positive(),
+});
+
+export const variableExpenseOverrideListItemSchema =
+  variableExpenseOverrideSchema.extend({
+    id: z.string().uuid(),
+    accountName: z.string().min(1).max(120),
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
+  });
+
+export const removeVariableExpenseOverrideInputSchema = z.object({
+  accountId: z.string().uuid('Selecione uma conta valida.'),
+  description: z.string().min(1, 'Informe a descricao da despesa variavel.'),
+  occurrenceDate: z.string().regex(
+    /^\d{4}-\d{2}-\d{2}$/,
+    'Informe uma data valida no formato AAAA-MM-DD.',
+  ),
+});
+
+export const projectedVariableExpenseSources = [
+  'movingAverage',
+  'manualOverride',
+] as const;
+
+export const projectedVariableExpenseSourceSchema = z.enum(
+  projectedVariableExpenseSources,
+);
+
+export const projectedVariableExpenseOccurrenceSchema = z.object({
+  id: z.string().min(1),
+  accountId: z.string().uuid(),
+  accountName: z.string().min(1).max(120),
+  description: z.string().min(1).max(120),
+  amountInCents: z.number().int().positive(),
+  signedAmountInCents: z.number().int(),
+  occurrenceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  historyMonthCount: z.number().int().min(1),
+  windowInMonths: z.number().int().min(3).max(6),
+  source: projectedVariableExpenseSourceSchema,
+});
+
+export const variableExpenseSnapshotSchema = z.object({
+  overrides: z.array(variableExpenseOverrideListItemSchema),
+  projectedOccurrences: z.array(projectedVariableExpenseOccurrenceSchema),
+});
+
 export interface ManualTransaction {
   id: string;
   accountId: string;
@@ -69,13 +120,22 @@ export interface TransactionListItem extends ManualTransaction {
   signedAmountInCents: number;
 }
 
-export type ProjectedVariableExpenseSource = 'movingAverage' | 'manualOverride';
+export type ProjectedVariableExpenseSource =
+  (typeof projectedVariableExpenseSources)[number];
 
 export interface VariableExpenseOverride {
   accountId: string;
   description: string;
   occurrenceDate: string;
   amountInCents: number;
+}
+
+export interface VariableExpenseOverrideListItem
+  extends VariableExpenseOverride {
+  id: string;
+  accountName: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface RemoveVariableExpenseOverrideInput {
@@ -95,6 +155,11 @@ export interface ProjectedVariableExpenseOccurrence {
   historyMonthCount: number;
   windowInMonths: number;
   source: ProjectedVariableExpenseSource;
+}
+
+export interface VariableExpenseSnapshot {
+  overrides: VariableExpenseOverrideListItem[];
+  projectedOccurrences: ProjectedVariableExpenseOccurrence[];
 }
 
 export interface TransactionsSnapshot {
@@ -127,3 +192,18 @@ export type UpdateTransactionInputPayload = z.infer<
   typeof updateTransactionInputSchema
 >;
 export type DeleteTransactionInput = z.infer<typeof deleteTransactionInputSchema>;
+export type VariableExpenseOverridePayload = z.infer<
+  typeof variableExpenseOverrideSchema
+>;
+export type VariableExpenseOverrideListItemPayload = z.infer<
+  typeof variableExpenseOverrideListItemSchema
+>;
+export type RemoveVariableExpenseOverrideInputPayload = z.infer<
+  typeof removeVariableExpenseOverrideInputSchema
+>;
+export type ProjectedVariableExpenseOccurrencePayload = z.infer<
+  typeof projectedVariableExpenseOccurrenceSchema
+>;
+export type VariableExpenseSnapshotPayload = z.infer<
+  typeof variableExpenseSnapshotSchema
+>;

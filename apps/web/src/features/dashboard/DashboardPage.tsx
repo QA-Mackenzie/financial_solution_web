@@ -10,13 +10,16 @@ import { useForm } from 'react-hook-form';
 
 import {
   formatCurrencyInCents,
+  formatDate,
   formatDateTime,
   formatMonthYear,
 } from '../../lib/finance-format';
 import {
   useContractsSnapshotQuery,
   useHorizonSnapshotQuery,
+  useProvisionsSnapshotQuery,
   useUpdateHorizonSettingsMutation,
+  useVariableExpenseSnapshotQuery,
 } from '../finance/use-finance';
 
 const defaultSettings: UpdateHorizonSettingsInput = {
@@ -38,10 +41,64 @@ function getPrimaryRiskMonth(months: FinancialHorizonMonth[]) {
   );
 }
 
+function buildVariableExpenseSummaryByMonth(
+  months: Array<{
+    amountInCents: number;
+    occurrenceDate: string;
+    source: 'manualOverride' | 'movingAverage';
+  }>,
+) {
+  return months.reduce<
+    Record<
+      string,
+      {
+        manualOverrideCount: number;
+        movingAverageCount: number;
+        totalAmountInCents: number;
+      }
+    >
+  >((result, occurrence) => {
+    const monthStart = `${occurrence.occurrenceDate.slice(0, 7)}-01`;
+    const currentMonth = result[monthStart] ?? {
+      manualOverrideCount: 0,
+      movingAverageCount: 0,
+      totalAmountInCents: 0,
+    };
+
+    currentMonth.totalAmountInCents += occurrence.amountInCents;
+
+    if (occurrence.source === 'manualOverride') {
+      currentMonth.manualOverrideCount += 1;
+    } else {
+      currentMonth.movingAverageCount += 1;
+    }
+
+    result[monthStart] = currentMonth;
+
+    return result;
+  }, {});
+}
+
+function getNextProvisionRelease(
+  occurrences: Array<{ amountInCents: number; kind: 'allocation' | 'release'; occurrenceDate: string }>,
+) {
+  return occurrences.find((occurrence) => occurrence.kind === 'release') ?? null;
+}
+
+function getNextManualOverride(
+  occurrences: Array<{ amountInCents: number; occurrenceDate: string; source: 'manualOverride' | 'movingAverage' }>,
+) {
+  return (
+    occurrences.find((occurrence) => occurrence.source === 'manualOverride') ?? null
+  );
+}
+
 export function DashboardPage() {
   const horizonSnapshotQuery = useHorizonSnapshotQuery();
   const contractsSnapshotQuery = useContractsSnapshotQuery();
+  const provisionsSnapshotQuery = useProvisionsSnapshotQuery();
   const updateHorizonSettingsMutation = useUpdateHorizonSettingsMutation();
+  const variableExpenseSnapshotQuery = useVariableExpenseSnapshotQuery();
   const {
     handleSubmit,
     register,
@@ -57,6 +114,17 @@ export function DashboardPage() {
   const currentMonth = months[0] ?? null;
   const primaryRiskMonth = getPrimaryRiskMonth(months);
   const recurringSummary = contractsSnapshotQuery.data;
+  const totalReservedInCurrentMonth =
+    currentMonth?.provisionReservedBalanceInCents ?? 0;
+  const nextProvisionRelease = getNextProvisionRelease(
+    provisionsSnapshotQuery.data?.projectedOccurrences ?? [],
+  );
+  const nextManualOverride = getNextManualOverride(
+    variableExpenseSnapshotQuery.data?.projectedOccurrences ?? [],
+  );
+  const variableExpenseSummaryByMonth = buildVariableExpenseSummaryByMonth(
+    variableExpenseSnapshotQuery.data?.projectedOccurrences ?? [],
+  );
 
   useEffect(() => {
     if (settings) {
@@ -75,9 +143,9 @@ export function DashboardPage() {
         <h2>Horizonte oficial de 24 meses no backend.</h2>
         <p>
           O horizonte oficial agora combina saldo atual, historico recente e
-          contratos recorrentes com faturas de cartao ja consolidadas por
-          vencimento, mantendo a projecao mensal auditavel diretamente no
-          backend.
+          contratos recorrentes com faturas de cartao, parcelamentos,
+          provisoes e despesas variaveis calculadas no backend com suporte a
+          override manual por mes futuro.
         </p>
         <small className="helper-text">
           Ultima geracao:{' '}
@@ -97,6 +165,20 @@ export function DashboardPage() {
             ? `Mes de referencia: ${formatMonthYear(currentMonth.monthStart)}.`
             : 'O backend ainda nao retornou o horizonte oficial.'}
         </p>
+        {currentMonth?.cashClosingBalanceInCents !== undefined ? (
+          <div className="detail-list">
+            <div className="detail-item">
+              <strong>Fechamento de caixa</strong>
+              <span>
+                {formatCurrencyInCents(currentMonth.cashClosingBalanceInCents)}
+              </span>
+            </div>
+            <div className="detail-item">
+              <strong>Reserva blindada</strong>
+              <span>{formatCurrencyInCents(totalReservedInCurrentMonth)}</span>
+            </div>
+          </div>
+        ) : null}
       </article>
 
       <article className="dashboard-card">
@@ -140,6 +222,56 @@ export function DashboardPage() {
               {formatCurrencyInCents(
                 -1 * (recurringSummary?.totalActiveExpenseInCents ?? 0),
               )}
+            </span>
+          </div>
+        </div>
+      </article>
+
+      <article className="dashboard-card">
+        <h3>Blindagem por provisao</h3>
+        <div className="detail-list">
+          <div className="detail-item">
+            <strong>Meta total ativa</strong>
+            <span>
+              {formatCurrencyInCents(
+                provisionsSnapshotQuery.data?.totalActiveTargetAmountInCents ?? 0,
+              )}
+            </span>
+          </div>
+          <div className="detail-item">
+            <strong>Reserva disponivel hoje</strong>
+            <span>{formatCurrencyInCents(totalReservedInCurrentMonth)}</span>
+          </div>
+          <div className="detail-item">
+            <strong>Proxima liberacao</strong>
+            <span>
+              {nextProvisionRelease
+                ? `${formatMonthYear(nextProvisionRelease.occurrenceDate)} • ${formatCurrencyInCents(nextProvisionRelease.amountInCents)}`
+                : 'Nenhuma liberacao futura'}
+            </span>
+          </div>
+        </div>
+      </article>
+
+      <article className="dashboard-card">
+        <h3>Despesas variaveis futuras</h3>
+        <div className="detail-list">
+          <div className="detail-item">
+            <strong>Series projetadas</strong>
+            <span>
+              {variableExpenseSnapshotQuery.data?.projectedOccurrences.length ?? 0}
+            </span>
+          </div>
+          <div className="detail-item">
+            <strong>Overrides manuais</strong>
+            <span>{variableExpenseSnapshotQuery.data?.overrides.length ?? 0}</span>
+          </div>
+          <div className="detail-item">
+            <strong>Proximo ajuste manual</strong>
+            <span>
+              {nextManualOverride
+                ? `${formatDate(nextManualOverride.occurrenceDate)} • ${formatCurrencyInCents(nextManualOverride.amountInCents)}`
+                : 'Sem override futuro'}
             </span>
           </div>
         </div>
@@ -213,9 +345,9 @@ export function DashboardPage() {
       <article className="dashboard-card">
         <h3>Proximas entregas</h3>
         <p>
-          Contratos recorrentes e cartoes de credito ja alimentam o horizonte
-          automaticamente. O proximo passo evolutivo e ampliar a cobertura para
-          parcelamentos e provisoes dentro do mesmo painel.
+          Contratos, cartoes, parcelamentos, provisoes e overrides manuais ja
+          alimentam o horizonte oficial. O proximo passo natural e aprofundar a
+          leitura analitica e a automacao operacional sobre essa base.
         </p>
       </article>
 
@@ -252,6 +384,14 @@ export function DashboardPage() {
                 </div>
 
                 <div className="horizon-metrics">
+                  {month.cashOpeningBalanceInCents !== undefined ? (
+                    <div className="detail-item">
+                      <strong>Caixa bruto</strong>
+                      <span>
+                        {formatCurrencyInCents(month.cashOpeningBalanceInCents)}
+                      </span>
+                    </div>
+                  ) : null}
                   <div className="detail-item">
                     <strong>Abertura</strong>
                     <span>{formatCurrencyInCents(month.openingBalanceInCents)}</span>
@@ -268,6 +408,56 @@ export function DashboardPage() {
                     <strong>Fechamento</strong>
                     <span>{formatCurrencyInCents(month.closingBalanceInCents)}</span>
                   </div>
+                  {month.provisionAllocationInCents ? (
+                    <div className="detail-item">
+                      <strong>Reserva do mes</strong>
+                      <span>
+                        {formatCurrencyInCents(month.provisionAllocationInCents)}
+                      </span>
+                    </div>
+                  ) : null}
+                  {month.provisionReleaseInCents ? (
+                    <div className="detail-item">
+                      <strong>Liberacao</strong>
+                      <span>
+                        {formatCurrencyInCents(month.provisionReleaseInCents)}
+                      </span>
+                    </div>
+                  ) : null}
+                  {month.provisionReservedBalanceInCents ? (
+                    <div className="detail-item">
+                      <strong>Blindagem acumulada</strong>
+                      <span>
+                        {formatCurrencyInCents(
+                          month.provisionReservedBalanceInCents,
+                        )}
+                      </span>
+                    </div>
+                  ) : null}
+                  {(variableExpenseSummaryByMonth[month.monthStart]?.totalAmountInCents ?? 0) >
+                  0 ? (
+                    <div className="detail-item">
+                      <strong>Despesa variavel</strong>
+                      <span>
+                        {formatCurrencyInCents(
+                          variableExpenseSummaryByMonth[month.monthStart]
+                            .totalAmountInCents,
+                        )}
+                      </span>
+                    </div>
+                  ) : null}
+                  {(variableExpenseSummaryByMonth[month.monthStart]?.manualOverrideCount ??
+                    0) > 0 ? (
+                    <div className="detail-item">
+                      <strong>Overrides manuais</strong>
+                      <span>
+                        {
+                          variableExpenseSummaryByMonth[month.monthStart]
+                            .manualOverrideCount
+                        }
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ))}

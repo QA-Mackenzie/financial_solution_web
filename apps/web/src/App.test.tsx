@@ -7,8 +7,13 @@ import type {
   HorizonSnapshot,
   InstallmentOperation,
   InstallmentPlanListItem,
+  ManualTransaction,
+  ProvisionListItem,
+  ProvisionsPlanningSnapshot,
   SessionPayload,
   TransactionsSnapshot,
+  VariableExpenseOverrideListItem,
+  VariableExpenseSnapshot,
 } from '@shf/contracts';
 import {
   buildCombinedCreditCardFinancials,
@@ -21,6 +26,9 @@ import {
   buildProjectedCreditCardInvoiceOccurrences,
   buildProjectedInstallmentCreditCardPurchases,
   buildProjectedInstallmentOccurrences,
+  buildProjectedProvisionOccurrences,
+  buildProjectedVariableExpenseOccurrences,
+  buildProvisionAdjustedHorizon,
 } from '@shf/domain-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -35,6 +43,18 @@ function mockJsonResponse(body: unknown) {
     },
   });
 }
+
+const emptyProvisionsPlanningSnapshot: ProvisionsPlanningSnapshot = {
+  activeProvisions: [],
+  redeemedProvisions: [],
+  totalActiveTargetAmountInCents: 0,
+  projectedOccurrences: [],
+};
+
+const emptyVariableExpenseSnapshot: VariableExpenseSnapshot = {
+  overrides: [],
+  projectedOccurrences: [],
+};
 
 function mockAuthenticatedShellResponses() {
   const session: SessionPayload = {
@@ -112,6 +132,14 @@ function mockAuthenticatedShellResponses() {
 
     if (pathname === '/api/v1/contracts') {
       return mockJsonResponse({ snapshot: contractsSnapshot });
+    }
+
+    if (pathname === '/api/v1/provisions') {
+      return mockJsonResponse({ snapshot: emptyProvisionsPlanningSnapshot });
+    }
+
+    if (pathname === '/api/v1/variable-expense-overrides') {
+      return mockJsonResponse({ snapshot: emptyVariableExpenseSnapshot });
     }
 
     return mockJsonResponse({});
@@ -429,6 +457,14 @@ function mockInteractiveFinanceFlow() {
 
     if (pathname === '/api/v1/contracts' && method === 'GET') {
       return mockJsonResponse({ snapshot: buildContractsSnapshot() });
+    }
+
+    if (pathname === '/api/v1/provisions' && method === 'GET') {
+      return mockJsonResponse({ snapshot: emptyProvisionsPlanningSnapshot });
+    }
+
+    if (pathname === '/api/v1/variable-expense-overrides' && method === 'GET') {
+      return mockJsonResponse({ snapshot: emptyVariableExpenseSnapshot });
     }
 
     if (pathname === '/api/v1/contracts' && method === 'POST') {
@@ -914,6 +950,14 @@ function mockCreditCardShellFlow() {
       return mockJsonResponse({ snapshot: emptyContractsSnapshot });
     }
 
+    if (pathname === '/api/v1/provisions' && method === 'GET') {
+      return mockJsonResponse({ snapshot: emptyProvisionsPlanningSnapshot });
+    }
+
+    if (pathname === '/api/v1/variable-expense-overrides' && method === 'GET') {
+      return mockJsonResponse({ snapshot: emptyVariableExpenseSnapshot });
+    }
+
     if (pathname === '/api/v1/horizon' && method === 'GET') {
       return mockJsonResponse({ snapshot: buildHorizonSnapshot() });
     }
@@ -1317,6 +1361,418 @@ function mockInstallmentShellFlow() {
 
     if (pathname === '/api/v1/contracts' && method === 'GET') {
       return mockJsonResponse({ snapshot: emptyContractsSnapshot });
+    }
+
+    if (pathname === '/api/v1/provisions' && method === 'GET') {
+      return mockJsonResponse({ snapshot: emptyProvisionsPlanningSnapshot });
+    }
+
+    if (pathname === '/api/v1/variable-expense-overrides' && method === 'GET') {
+      return mockJsonResponse({ snapshot: emptyVariableExpenseSnapshot });
+    }
+
+    if (pathname === '/api/v1/horizon' && method === 'GET') {
+      return mockJsonResponse({ snapshot: buildHorizonSnapshot() });
+    }
+
+    return mockJsonResponse({});
+  });
+}
+
+function mockProvisionShellFlow() {
+  const session: SessionPayload = {
+    user: {
+      id: '92f49d09-7671-4518-bd08-c566ce68636a',
+      name: 'Alexandre Demo',
+      email: 'alexandre@example.com',
+      emailVerifiedAt: null,
+    },
+    expiresAt: '2026-01-08T12:00:00.000Z',
+    issuedAt: '2026-01-01T12:00:00.000Z',
+  };
+  const referenceDate = '2026-05-01';
+  const generatedAt = '2026-05-01T12:00:00.000Z';
+  const state = {
+    accounts: [
+      {
+        id: '11111111-1111-4111-8111-111111111111',
+        name: 'Conta Planejamento Web',
+        type: 'checking' as const,
+        openingBalanceInCents: 200000,
+        isArchived: false,
+        archivedAt: null,
+        createdAt: '2026-01-01T12:00:00.000Z',
+        updatedAt: '2026-01-01T12:00:00.000Z',
+      },
+    ],
+    overrides: [] as VariableExpenseOverrideListItem[],
+    provisions: [] as ProvisionListItem[],
+    settings: {
+      safetyMarginInCents: 50000,
+      variableExpenseWindowInMonths: 3,
+    },
+    transactions: [
+      {
+        id: 'tx-1',
+        accountId: '11111111-1111-4111-8111-111111111111',
+        type: 'expense' as const,
+        description: 'Supermercado',
+        category: 'Mercado',
+        amountInCents: 10000,
+        transactionDate: '2026-02-10',
+        createdAt: '2026-02-10T12:00:00.000Z',
+        updatedAt: '2026-02-10T12:00:00.000Z',
+      },
+      {
+        id: 'tx-2',
+        accountId: '11111111-1111-4111-8111-111111111111',
+        type: 'expense' as const,
+        description: 'Supermercado',
+        category: 'Mercado',
+        amountInCents: 12000,
+        transactionDate: '2026-03-10',
+        createdAt: '2026-03-10T12:00:00.000Z',
+        updatedAt: '2026-03-10T12:00:00.000Z',
+      },
+      {
+        id: 'tx-3',
+        accountId: '11111111-1111-4111-8111-111111111111',
+        type: 'expense' as const,
+        description: 'Supermercado',
+        category: 'Mercado',
+        amountInCents: 14000,
+        transactionDate: '2026-04-10',
+        createdAt: '2026-04-10T12:00:00.000Z',
+        updatedAt: '2026-04-10T12:00:00.000Z',
+      },
+    ] as ManualTransaction[],
+  };
+  const emptyContractsSnapshot: ContractsSnapshot = {
+    activeContracts: [],
+    inactiveContracts: [],
+    totalActiveIncomeInCents: 0,
+    totalActiveExpenseInCents: 0,
+    netActiveAmountInCents: 0,
+  };
+
+  function buildAccountsSnapshot(): AccountsSnapshot {
+    const activeAccounts = state.accounts
+      .filter((account) => !account.isArchived)
+      .map((account) => {
+        const currentBalanceInCents = state.transactions.reduce(
+          (sum, transaction) =>
+            transaction.accountId === account.id
+              ? sum +
+                (transaction.type === 'income'
+                  ? transaction.amountInCents
+                  : -transaction.amountInCents)
+              : sum,
+          account.openingBalanceInCents,
+        );
+
+        return {
+          ...account,
+          currentBalanceInCents,
+        };
+      });
+
+    return {
+      activeAccounts,
+      archivedAccounts: [],
+      consolidatedBalanceInCents: activeAccounts.reduce(
+        (sum, account) => sum + account.currentBalanceInCents,
+        0,
+      ),
+    };
+  }
+
+  function buildTransactionsSnapshot(): TransactionsSnapshot {
+    const transactions = state.transactions.map((transaction) => ({
+      ...transaction,
+      accountName:
+        state.accounts.find((account) => account.id === transaction.accountId)?.name ??
+        '',
+      signedAmountInCents:
+        transaction.type === 'income'
+          ? transaction.amountInCents
+          : -transaction.amountInCents,
+      tagIds: undefined,
+    }));
+
+    return {
+      totalExpenseInCents: transactions
+        .filter((transaction) => transaction.type === 'expense')
+        .reduce((sum, transaction) => sum + transaction.amountInCents, 0),
+      totalIncomeInCents: transactions
+        .filter((transaction) => transaction.type === 'income')
+        .reduce((sum, transaction) => sum + transaction.amountInCents, 0),
+      transactions,
+    };
+  }
+
+  function buildProvisionsSnapshot(): ProvisionsPlanningSnapshot {
+    const activeProvisions = state.provisions
+      .filter((provision) => provision.status === 'active')
+      .sort((left, right) => left.targetDate.localeCompare(right.targetDate));
+    const redeemedProvisions = state.provisions
+      .filter((provision) => provision.status === 'redeemed')
+      .sort((left, right) =>
+        (right.redeemedAt ?? right.targetDate).localeCompare(
+          left.redeemedAt ?? left.targetDate,
+        ),
+      );
+    const snapshot = {
+      activeProvisions,
+      redeemedProvisions,
+      totalActiveTargetAmountInCents: activeProvisions.reduce(
+        (sum, provision) => sum + provision.targetAmountInCents,
+        0,
+      ),
+    };
+
+    return {
+      ...snapshot,
+      projectedOccurrences: buildProjectedProvisionOccurrences(snapshot, {
+        currentDate: referenceDate,
+        totalMonths: 24,
+      }),
+    };
+  }
+
+  function buildVariableExpenseSnapshot(): VariableExpenseSnapshot {
+    return {
+      overrides: state.overrides.slice(),
+      projectedOccurrences: buildProjectedVariableExpenseOccurrences(
+        buildAccountsSnapshot(),
+        buildTransactionsSnapshot(),
+        {
+          currentDate: referenceDate,
+          overrides: state.overrides.map((override) => ({
+            accountId: override.accountId,
+            amountInCents: override.amountInCents,
+            description: override.description,
+            occurrenceDate: override.occurrenceDate,
+          })),
+          totalMonths: 24,
+          windowInMonths: state.settings.variableExpenseWindowInMonths,
+        },
+      ),
+    };
+  }
+
+  function buildHorizonSnapshot(): HorizonSnapshot {
+    const accountsSnapshot = buildAccountsSnapshot();
+    const transactionsSnapshot = buildTransactionsSnapshot();
+    const provisionsSnapshot = buildProvisionsSnapshot();
+    const variableExpenseSnapshot = buildVariableExpenseSnapshot();
+    const baseHorizon = buildFinancialHorizon(
+      accountsSnapshot,
+      transactionsSnapshot,
+      {
+        currentDate: referenceDate,
+        projectedContractOccurrences: [],
+        projectedCreditCardInvoiceOccurrences: [],
+        projectedInstallmentOccurrences: [],
+        projectedVariableExpenseOccurrences:
+          variableExpenseSnapshot.projectedOccurrences,
+        safetyMarginInCents: state.settings.safetyMarginInCents,
+        totalMonths: 24,
+      },
+    );
+
+    return {
+      generatedAt,
+      settings: state.settings,
+      horizon:
+        provisionsSnapshot.projectedOccurrences.length > 0
+          ? buildProvisionAdjustedHorizon(
+              baseHorizon,
+              provisionsSnapshot.projectedOccurrences,
+              state.settings.safetyMarginInCents,
+            )
+          : baseHorizon,
+    };
+  }
+
+  function nextUuid(serial: number) {
+    return `00000000-0000-4000-8000-${String(serial).padStart(12, '0')}`;
+  }
+
+  return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    const urlValue = input instanceof Request ? input.url : String(input);
+    const pathname = new URL(urlValue).pathname;
+    const method = (init?.method ?? 'GET').toUpperCase();
+
+    if (pathname === '/api/v1/session') {
+      return mockJsonResponse({ session });
+    }
+
+    if (pathname === '/api/v1/accounts' && method === 'GET') {
+      return mockJsonResponse({ snapshot: buildAccountsSnapshot() });
+    }
+
+    if (pathname === '/api/v1/contracts' && method === 'GET') {
+      return mockJsonResponse({ snapshot: emptyContractsSnapshot });
+    }
+
+    if (pathname === '/api/v1/provisions' && method === 'GET') {
+      return mockJsonResponse({ snapshot: buildProvisionsSnapshot() });
+    }
+
+    if (pathname === '/api/v1/provisions' && method === 'POST') {
+      const payload = JSON.parse(String(init?.body)) as {
+        accountId: string;
+        category: string;
+        description: string;
+        startDate: string;
+        targetAmountInCents: number;
+        targetDate: string;
+      };
+      const provision: ProvisionListItem = {
+        id: nextUuid(state.provisions.length + 1),
+        accountId: payload.accountId,
+        accountName:
+          state.accounts.find((account) => account.id === payload.accountId)?.name ?? '',
+        category: payload.category,
+        createdAt: generatedAt,
+        description: payload.description,
+        redeemedAt: null,
+        startDate: payload.startDate,
+        status: 'active',
+        targetAmountInCents: payload.targetAmountInCents,
+        targetDate: payload.targetDate,
+        updatedAt: generatedAt,
+      };
+
+      state.provisions = [...state.provisions, provision];
+
+      return mockJsonResponse({ provision });
+    }
+
+    if (pathname.startsWith('/api/v1/provisions/') && method === 'PUT') {
+      const provisionId = pathname.split('/').at(-1) ?? '';
+      const payload = JSON.parse(String(init?.body)) as {
+        accountId: string;
+        category: string;
+        description: string;
+        startDate: string;
+        targetAmountInCents: number;
+        targetDate: string;
+      };
+
+      state.provisions = state.provisions.map((provision) =>
+        provision.id === provisionId
+          ? {
+              ...provision,
+              accountId: payload.accountId,
+              accountName:
+                state.accounts.find((account) => account.id === payload.accountId)?.name ??
+                '',
+              category: payload.category,
+              description: payload.description,
+              redeemedAt: null,
+              startDate: payload.startDate,
+              status: 'active',
+              targetAmountInCents: payload.targetAmountInCents,
+              targetDate: payload.targetDate,
+              updatedAt: generatedAt,
+            }
+          : provision,
+      );
+
+      return mockJsonResponse({
+        provision: state.provisions.find((provision) => provision.id === provisionId),
+      });
+    }
+
+    if (pathname.endsWith('/redeem') && method === 'POST') {
+      const provisionId = pathname.split('/').at(-2) ?? '';
+      const payload = JSON.parse(String(init?.body)) as { redeemedAt: string };
+
+      state.provisions = state.provisions.map((provision) =>
+        provision.id === provisionId
+          ? {
+              ...provision,
+              redeemedAt: payload.redeemedAt,
+              status: 'redeemed',
+              updatedAt: generatedAt,
+            }
+          : provision,
+      );
+
+      return mockJsonResponse({
+        provision: state.provisions.find((provision) => provision.id === provisionId),
+      });
+    }
+
+    if (pathname === '/api/v1/variable-expense-overrides' && method === 'GET') {
+      return mockJsonResponse({ snapshot: buildVariableExpenseSnapshot() });
+    }
+
+    if (pathname === '/api/v1/variable-expense-overrides' && method === 'PUT') {
+      const payload = JSON.parse(String(init?.body)) as {
+        accountId: string;
+        amountInCents: number;
+        description: string;
+        occurrenceDate: string;
+      };
+      const existingOverride = state.overrides.find(
+        (override) =>
+          override.accountId === payload.accountId &&
+          override.description === payload.description &&
+          override.occurrenceDate === payload.occurrenceDate,
+      );
+      const override: VariableExpenseOverrideListItem = existingOverride
+        ? {
+            ...existingOverride,
+            amountInCents: payload.amountInCents,
+            updatedAt: generatedAt,
+          }
+        : {
+            id: nextUuid(500 + state.overrides.length + 1),
+            accountId: payload.accountId,
+            accountName:
+              state.accounts.find((account) => account.id === payload.accountId)?.name ?? '',
+            amountInCents: payload.amountInCents,
+            createdAt: generatedAt,
+            description: payload.description,
+            occurrenceDate: payload.occurrenceDate,
+            updatedAt: generatedAt,
+          };
+
+      state.overrides = existingOverride
+        ? state.overrides.map((currentOverride) =>
+            currentOverride.id === existingOverride.id ? override : currentOverride,
+          )
+        : [...state.overrides, override];
+
+      return mockJsonResponse({ override });
+    }
+
+    if (pathname === '/api/v1/variable-expense-overrides' && method === 'DELETE') {
+      const payload = JSON.parse(String(init?.body)) as {
+        accountId: string;
+        description: string;
+        occurrenceDate: string;
+      };
+      const removedOverride =
+        state.overrides.find(
+          (override) =>
+            override.accountId === payload.accountId &&
+            override.description === payload.description &&
+            override.occurrenceDate === payload.occurrenceDate,
+        ) ?? null;
+
+      state.overrides = state.overrides.filter(
+        (override) =>
+          !(
+            override.accountId === payload.accountId &&
+            override.description === payload.description &&
+            override.occurrenceDate === payload.occurrenceDate
+          ),
+      );
+
+      return mockJsonResponse({ override: removedOverride });
     }
 
     if (pathname === '/api/v1/horizon' && method === 'GET') {
@@ -1985,6 +2441,162 @@ describe('App', () => {
     expect(within(juneExpense as HTMLElement).getByText(/R\$\s*600,00/)).toBeInTheDocument();
     expect(within(julyExpense as HTMLElement).getByText(/R\$\s*0,00/)).toBeInTheDocument();
     expect(within(augustExpense as HTMLElement).getByText(/R\$\s*600,00/)).toBeInTheDocument();
+  });
+
+  it('gerencia provisoes e overrides manuais pela shell web', async () => {
+    window.history.pushState({}, '', '/app/provisoes');
+
+    mockProvisionShellFlow();
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', {
+          name: 'Provisoes e despesas variaveis futuras',
+        }),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText('Conta de reserva')).toBeInTheDocument();
+    });
+
+    fireEvent.change(
+      screen.getByPlaceholderText('Ex.: IPVA, seguro anual, viagem'),
+      {
+        target: { value: 'Seguro anual' },
+      },
+    );
+    fireEvent.change(screen.getByPlaceholderText('Ex.: Casa'), {
+      target: { value: 'Casa' },
+    });
+    fireEvent.change(screen.getByLabelText('Meta em centavos'), {
+      target: { value: '90000' },
+    });
+    fireEvent.change(screen.getByLabelText('Inicio da reserva'), {
+      target: { value: '2026-05-05' },
+    });
+    fireEvent.change(screen.getByLabelText('Data de resgate'), {
+      target: { value: '2026-08-10' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Criar provisao' }));
+
+    await waitFor(() => {
+      const provisionsSection = screen
+        .getByRole('heading', { name: 'Provisoes cadastradas' })
+        .closest('article');
+      const timelineSection = screen
+        .getByRole('heading', { name: 'Distribuicao mensal planejada' })
+        .closest('article');
+
+      expect(provisionsSection).not.toBeNull();
+      expect(timelineSection).not.toBeNull();
+      expect(
+        within(provisionsSection as HTMLElement).getByText('Seguro anual'),
+      ).toBeInTheDocument();
+      expect(
+        within(timelineSection as HTMLElement).getByText(/01\/05\/2026/),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.change(
+      screen.getByPlaceholderText('Ex.: supermercado, energia, combustivel'),
+      {
+        target: { value: 'Supermercado' },
+      },
+    );
+    fireEvent.change(screen.getByLabelText('Mes futuro'), {
+      target: { value: '2026-06-10' },
+    });
+    fireEvent.change(screen.getByLabelText('Novo valor em centavos'), {
+      target: { value: '18500' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar override' }));
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Override manual').length).toBeGreaterThan(0);
+      expect(screen.getByText('Meses ajustados manualmente')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('link', { name: 'Visao geral' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', {
+          name: 'Horizonte oficial de 24 meses no backend.',
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: 'Blindagem por provisao' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: 'Despesas variaveis futuras' }),
+      ).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('2026-05-01')).toBeInTheDocument();
+      expect(screen.getByText('2026-06-01')).toBeInTheDocument();
+    });
+
+    const mayCard = screen.getByText('2026-05-01').closest('.horizon-list-card');
+    const juneCard = screen.getByText('2026-06-01').closest('.horizon-list-card');
+
+    expect(mayCard).not.toBeNull();
+    expect(juneCard).not.toBeNull();
+    expect(
+      within(mayCard as HTMLElement).getByText('Reserva do mes'),
+    ).toBeInTheDocument();
+    expect(
+      within(juneCard as HTMLElement).getByText('Overrides manuais'),
+    ).toBeInTheDocument();
+    const juneExpense = within(juneCard as HTMLElement).getByText('Saidas').closest('div');
+
+    expect(juneExpense).not.toBeNull();
+    expect(
+      within(juneExpense as HTMLElement).getByText(/R\$\s*185,00/),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('link', { name: 'Provisoes' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', {
+          name: 'Provisoes e despesas variaveis futuras',
+        }),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Editar provisao' }));
+    fireEvent.change(
+      screen.getByPlaceholderText('Ex.: IPVA, seguro anual, viagem'),
+      {
+        target: { value: 'Seguro anual familiar' },
+      },
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Atualizar provisao' }));
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Seguro anual familiar').length).toBeGreaterThan(0);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Preparar resgate' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar resgate' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Historico resgatado')).toBeInTheDocument();
+      expect(screen.getByText('Resgatada')).toBeInTheDocument();
+      expect(
+        screen.getByText('Nao ha ocorrencias futuras de provisao no horizonte atual.'),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remover override' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Sem overrides registrados. A media movel segue pura.'),
+      ).toBeInTheDocument();
+      expect(screen.getAllByText('Media movel').length).toBeGreaterThan(0);
+    });
   });
 
   it('mostra a tela de cadastro com o consentimento obrigatorio', async () => {

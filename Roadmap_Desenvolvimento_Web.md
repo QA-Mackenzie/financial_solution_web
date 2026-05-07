@@ -572,6 +572,8 @@ Parcelamentos passam a ser uma feature confiavel na web, com recalculo transpare
 
 ## Sprint 8 - Provisoes e despesas variaveis com override
 
+Status: concluida em 2026-05-07
+
 ### Objetivo
 
 Completar o nucleo de planejamento financeiro com reserva de caixa e previsao de despesas variaveis.
@@ -585,20 +587,57 @@ Completar o nucleo de planejamento financeiro com reserva de caixa e previsao de
 
 ### Backlog recomendado
 
-- [ ] Implementar schema e endpoints de provisoes
-- [ ] Portar provisionInput e provisionProjection
-- [ ] Implementar variable_expense_overrides por usuario
-- [ ] Portar variableExpenseProjection e integrar ao horizonte oficial
-- [ ] Criar UI de provisoes com meta, data de resgate e distribuicao mensal
-- [ ] Criar UI de override de despesa variavel por mes futuro
-- [ ] Integrar configuracao da janela de media movel no backend e no frontend
-- [ ] Criar testes de regressao para blindagem de caixa e sobrescrita manual
-- [ ] Criar E2E cobrindo provisao e override com reflexo no horizonte
-- [ ] Revisar visual do horizonte para diferenciar provisoes, despesas variaveis calculadas e overrides manuais
+- [x] Implementar schema e endpoints de provisoes
+- [x] Portar provisionInput e provisionProjection
+- [x] Implementar variable_expense_overrides por usuario
+- [x] Portar variableExpenseProjection e integrar ao horizonte oficial
+- [x] Criar UI de provisoes com meta, data de resgate e distribuicao mensal
+- [x] Criar UI de override de despesa variavel por mes futuro
+- [x] Integrar configuracao da janela de media movel no backend e no frontend
+- [x] Criar testes de regressao para blindagem de caixa e sobrescrita manual
+- [x] Criar E2E cobrindo provisao e override com reflexo no horizonte
+- [x] Revisar visual do horizonte para diferenciar provisoes, despesas variaveis calculadas e overrides manuais
 
 ### Gate de saida
 
 O horizonte web passa a representar nao apenas o historico e o fixo, mas tambem reserva de caixa e previsao dinamica de variaveis.
+
+### Implementado nesta sprint
+
+- contracts compartilhados expandidos com schemas Zod, tipos e payloads para provisoes, snapshots de planejamento de provisoes, overrides de despesas variaveis e enriquecimento opcional dos meses do horizonte oficial
+- camada owner-scoped da API ampliada com ProvisionsRepository e VariableExpenseOverridesRepository, bloqueio cross-user, snapshots consolidados e persistencia em finance.provisions e finance.variable_expense_overrides
+- FinanceService e rotas financeiras atualizados com CRUD de provisoes, upsert/remocao de overrides, auditoria dedicada e invalidacao de cache do horizonte quando reservas ou despesas variaveis futuras mudam
+- horizonte oficial recalculado no backend com buildProjectedProvisionOccurrences, buildProjectedVariableExpenseOccurrences e buildProvisionAdjustedHorizon, mantendo compatibilidade quando nao existem provisoes ativas
+- cliente web atualizado com endpoints e hooks React Query para snapshots, mutacoes de provisoes e overrides, invalidacao coordenada e pagina protegida de provisoes
+- nova pagina de provisoes entregue com criacao, edicao e resgate de provisoes, timeline de blindagem mensal, formulario de overrides e leitura das series variaveis futuras
+- dashboard principal revisado para destacar blindagem por provisao, proxima liberacao, overrides manuais e detalhes mensais de caixa bruto, reserva do mes e despesa variavel
+- cobertura automatizada ampliada com regressao do horizonte oficial, teste HTTP dedicado para provisoes/overrides por usuario e fluxo de shell web cobrindo provisao, override, dashboard, edicao, resgate e remocao
+
+### Provisoes e variaveis no horizonte oficial
+
+- provisoes ativas passam a reservar caixa mensalmente ate o mes alvo e liberam o valor acumulado no mes de resgate, refletindo caixa bruto, fechamento liquido e blindagem acumulada
+- despesas variaveis futuras continuam derivadas da media movel configurada pelo usuario, mas agora aceitam sobrescrita manual por conta, descricao e data futura especifica
+- o dashboard diferencia visualmente reserva do mes, liberacao, blindagem acumulada, despesa variavel projetada e quantidade de overrides manuais por mes
+
+### Consistencia e auditoria
+
+- criacao, atualizacao e resgate de provisoes rodam com validacao de dominio e auditoria dedicada, evitando estados parciais e mantendo rastreabilidade completa
+- overrides de despesa variavel sao tratados por chave natural accountId + description + occurrenceDate, permitindo update idempotente e remocao precisa sem duplicidade funcional
+- o horizonte so passa a expor campos adicionais de blindagem quando existem provisoes ativas, reduzindo ruido estrutural para consumidores e testes antigos
+
+### Validacao executada
+
+- npm run lint
+- npm run typecheck
+- npm run test
+- npx -y node@20 C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js run build
+- npm run infra:up
+- npm run db:check
+
+### Observacoes de ambiente
+
+- o build completo do monorepo foi validado com Node 20 sobre o npm global da maquina porque o frontend usa Vite 7 e o Node global 18.20.8 continua abaixo do requisito minimo
+- Docker Desktop e Postgres local estavam disponiveis nesta validacao; npm run infra:up manteve o container shf-web-postgres ativo e npm run db:check retornou status up
 
 ---
 
