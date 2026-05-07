@@ -423,6 +423,10 @@ button {
   gap: 10px;
 }
 
+.compact-row {
+  align-items: center;
+}
+
 .sub-entity-list {
   display: grid;
   gap: 10px;
@@ -450,6 +454,35 @@ button {
   color: #ffb4a2;
 }
 
+.stats-grid-inline {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.invoice-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 96px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.invoice-pill-open {
+  background: rgba(155, 231, 167, 0.18);
+  color: #b8f5c0;
+}
+
+.invoice-pill-upcoming {
+  background: rgba(255, 203, 119, 0.18);
+  color: #ffe3a8;
+}
+
+.invoice-pill-overdue {
+  background: rgba(255, 180, 162, 0.18);
+  color: #ffd3c7;
+}
+
 .screen-message {
   display: grid;
   min-height: 100vh;
@@ -472,7 +505,8 @@ button {
   }
 
   .settings-grid,
-  .horizon-metrics {
+  .horizon-metrics,
+  .stats-grid-inline {
     grid-template-columns: 1fr;
   }
 

@@ -1,10 +1,15 @@
 import type {
   Account,
   AccountsSnapshot,
+  CreditCardListItem,
+  CreditCardPurchaseListItem,
+  CreditCardsSnapshot,
   Contract,
   ContractAdjustment,
   ContractsSnapshot,
   CreateAccountInput,
+  CreateCreditCardInput,
+  CreateCreditCardPurchaseInput,
   CreateContractAdjustmentInput,
   CreateContractInput,
   CreateTransactionInput,
@@ -19,6 +24,8 @@ import type {
   SessionPayload,
   TransactionsSnapshot,
   UpdateAccountInput,
+  UpdateCreditCardInput,
+  UpdateCreditCardPurchaseInput,
   UpdateContractInput,
   UpdateHorizonSettingsInput,
   UpdateTransactionInput,
@@ -154,6 +161,13 @@ export const financeApi = {
 
     return payload.snapshot;
   },
+  async getCreditCardsSnapshot(): Promise<CreditCardsSnapshot> {
+    const payload = await request<{ snapshot: CreditCardsSnapshot }>(
+      '/api/v1/credit-cards',
+    );
+
+    return payload.snapshot;
+  },
   async updateHorizonSettings(
     input: UpdateHorizonSettingsInput,
   ): Promise<UpdateHorizonSettingsInput> {
@@ -174,6 +188,67 @@ export const financeApi = {
     });
 
     return payload.contract;
+  },
+  async createCreditCard(input: CreateCreditCardInput): Promise<CreditCardListItem> {
+    const payload = await request<{ creditCard: CreditCardListItem }>(
+      '/api/v1/credit-cards',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+    );
+
+    return payload.creditCard;
+  },
+  async updateCreditCard(input: UpdateCreditCardInput): Promise<CreditCardListItem> {
+    const payload = await request<{ creditCard: CreditCardListItem }>(
+      `/api/v1/credit-cards/${input.id}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          creditLimitInCents: input.creditLimitInCents,
+          dueDay: input.dueDay,
+          name: input.name,
+          paymentAccountId: input.paymentAccountId,
+          statementClosingDay: input.statementClosingDay,
+        }),
+      },
+    );
+
+    return payload.creditCard;
+  },
+  async createCreditCardPurchase(
+    input: CreateCreditCardPurchaseInput,
+  ): Promise<CreditCardPurchaseListItem> {
+    const payload = await request<{ purchase: CreditCardPurchaseListItem }>(
+      '/api/v1/credit-card-purchases',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+    );
+
+    return payload.purchase;
+  },
+  async updateCreditCardPurchase(
+    input: UpdateCreditCardPurchaseInput,
+  ): Promise<CreditCardPurchaseListItem> {
+    const payload = await request<{ purchase: CreditCardPurchaseListItem }>(
+      `/api/v1/credit-card-purchases/${input.id}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          amountInCents: input.amountInCents,
+          category: input.category,
+          creditCardId: input.creditCardId,
+          description: input.description,
+          purchaseDate: input.purchaseDate,
+          tagIds: input.tagIds,
+        }),
+      },
+    );
+
+    return payload.purchase;
   },
   async updateContract(input: UpdateContractInput): Promise<Contract> {
     const payload = await request<{ contract: Contract }>(

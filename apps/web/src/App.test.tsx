@@ -1,11 +1,21 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type {
   AccountsSnapshot,
+  CreditCard,
+  CreditCardPurchase,
   ContractsSnapshot,
   HorizonSnapshot,
   SessionPayload,
   TransactionsSnapshot,
 } from '@shf/contracts';
+import {
+  buildCreditCardInvoices,
+  buildCreditCardPurchaseListItems,
+  buildCurrentCreditCardCycle,
+  buildCurrentCreditCardInvoicePreview,
+  buildFinancialHorizon,
+  buildProjectedCreditCardInvoiceOccurrences,
+} from '@shf/domain-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from './App';
@@ -595,6 +605,317 @@ function mockInteractiveFinanceFlow() {
   });
 }
 
+function mockCreditCardShellFlow() {
+  const session: SessionPayload = {
+    user: {
+      id: '92f49d09-7671-4518-bd08-c566ce68636a',
+      name: 'Alexandre Demo',
+      email: 'alexandre@example.com',
+      emailVerifiedAt: null,
+    },
+    expiresAt: '2026-01-08T12:00:00.000Z',
+    issuedAt: '2026-01-01T12:00:00.000Z',
+  };
+  const referenceDate = '2026-05-06';
+  const state = {
+    accounts: [] as Array<{
+      id: string;
+      name: string;
+      type: 'checking' | 'savings' | 'cash' | 'investment' | 'other';
+      openingBalanceInCents: number;
+      isArchived: boolean;
+      archivedAt: string | null;
+      createdAt: string;
+      updatedAt: string;
+    }>,
+    creditCards: [] as CreditCard[],
+    purchases: [] as CreditCardPurchase[],
+    settings: {
+      safetyMarginInCents: 50000,
+      variableExpenseWindowInMonths: 3,
+    },
+  };
+  const emptyContractsSnapshot: ContractsSnapshot = {
+    activeContracts: [],
+    inactiveContracts: [],
+    totalActiveIncomeInCents: 0,
+    totalActiveExpenseInCents: 0,
+    netActiveAmountInCents: 0,
+  };
+
+  function buildAccountsSnapshot(): AccountsSnapshot {
+    const activeAccounts = state.accounts
+      .filter((account) => !account.isArchived)
+      .map((account) => ({
+        ...account,
+        currentBalanceInCents: account.openingBalanceInCents,
+      }));
+
+    return {
+      activeAccounts,
+      archivedAccounts: [],
+      consolidatedBalanceInCents: activeAccounts.reduce(
+        (sum, account) => sum + account.currentBalanceInCents,
+        0,
+      ),
+    };
+  }
+
+  function buildCreditCardsSnapshot() {
+    const billingCards = state.creditCards.map((card) => {
+      const paymentAccountName =
+        state.accounts.find((account) => account.id === card.paymentAccountId)?.name ?? '';
+
+      return {
+        dueDay: card.dueDay,
+        id: card.id,
+        name: card.name,
+        paymentAccountId: card.paymentAccountId,
+        paymentAccountName,
+        statementClosingDay: card.statementClosingDay,
+      };
+    });
+    const purchases = buildCreditCardPurchaseListItems(billingCards, state.purchases);
+    const invoices = buildCreditCardInvoices(purchases, referenceDate);
+    const cards = state.creditCards.map((card) => {
+      const paymentAccountName =
+        state.accounts.find((account) => account.id === card.paymentAccountId)?.name ?? '';
+      const currentCycle = buildCurrentCreditCardCycle(card, referenceDate);
+      const currentInvoicePreview = buildCurrentCreditCardInvoicePreview(
+        {
+          dueDay: card.dueDay,
+          id: card.id,
+          name: card.name,
+          statementClosingDay: card.statementClosingDay,
+        },
+        referenceDate,
+      );
+      const matchingInvoice = invoices.find(
+        (invoice) => invoice.id === `${card.id}:${currentCycle.invoiceMonth}`,
+      );
+
+      return {
+        ...card,
+        currentCycle,
+        currentInvoice: {
+          ...currentInvoicePreview,
+          totalAmountInCents: matchingInvoice?.totalAmountInCents ?? 0,
+        },
+        paymentAccountName,
+      };
+    });
+
+    return {
+      cards,
+      invoices,
+      projectedInvoices: buildProjectedCreditCardInvoiceOccurrences(
+        invoices,
+        referenceDate,
+      ),
+      purchases,
+      totalCreditLimitInCents: cards.reduce(
+        (sum, card) => sum + card.creditLimitInCents,
+        0,
+      ),
+      totalInvoiceAmountInCents: invoices.reduce(
+        (sum, invoice) => sum + invoice.totalAmountInCents,
+        0,
+      ),
+    };
+  }
+
+  function buildHorizonSnapshot(): HorizonSnapshot {
+    const accountsSnapshot = buildAccountsSnapshot();
+    const creditCardsSnapshot = buildCreditCardsSnapshot();
+
+    return {
+      generatedAt: '2026-05-06T13:00:00.000Z',
+      settings: state.settings,
+      horizon: buildFinancialHorizon(
+        accountsSnapshot,
+        {
+          totalExpenseInCents: 0,
+          totalIncomeInCents: 0,
+          transactions: [],
+        },
+        {
+          currentDate: referenceDate,
+          projectedCreditCardInvoiceOccurrences:
+            buildProjectedCreditCardInvoiceOccurrences(
+              creditCardsSnapshot.invoices,
+              referenceDate,
+            ),
+          safetyMarginInCents: state.settings.safetyMarginInCents,
+          totalMonths: 24,
+        },
+      ),
+    };
+  }
+
+  return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    const urlValue = input instanceof Request ? input.url : String(input);
+    const pathname = new URL(urlValue).pathname;
+    const method = (init?.method ?? 'GET').toUpperCase();
+
+    if (pathname === '/api/v1/session') {
+      return mockJsonResponse({ session });
+    }
+
+    if (pathname === '/api/v1/accounts' && method === 'GET') {
+      return mockJsonResponse({ snapshot: buildAccountsSnapshot() });
+    }
+
+    if (pathname === '/api/v1/accounts' && method === 'POST') {
+      const payload = JSON.parse(String(init?.body)) as {
+        name: string;
+        openingBalanceInCents: number;
+        type: 'checking' | 'savings' | 'cash' | 'investment' | 'other';
+      };
+      const account = {
+        id: '11111111-1111-4111-8111-111111111111',
+        name: payload.name,
+        type: payload.type,
+        openingBalanceInCents: payload.openingBalanceInCents,
+        isArchived: false,
+        archivedAt: null,
+        createdAt: '2026-05-06T12:00:00.000Z',
+        updatedAt: '2026-05-06T12:00:00.000Z',
+      };
+
+      state.accounts = [account];
+
+      return mockJsonResponse({ account });
+    }
+
+    if (pathname === '/api/v1/credit-cards' && method === 'GET') {
+      return mockJsonResponse({ snapshot: buildCreditCardsSnapshot() });
+    }
+
+    if (pathname === '/api/v1/credit-cards' && method === 'POST') {
+      const payload = JSON.parse(String(init?.body)) as {
+        name: string;
+        creditLimitInCents: number;
+        statementClosingDay: number;
+        dueDay: number;
+        paymentAccountId: string;
+      };
+      const creditCard: CreditCard = {
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        name: payload.name,
+        creditLimitInCents: payload.creditLimitInCents,
+        statementClosingDay: payload.statementClosingDay,
+        dueDay: payload.dueDay,
+        paymentAccountId: payload.paymentAccountId,
+        createdAt: '2026-05-06T12:10:00.000Z',
+        updatedAt: '2026-05-06T12:10:00.000Z',
+      };
+
+      state.creditCards = [...state.creditCards, creditCard];
+
+      return mockJsonResponse({
+        creditCard: buildCreditCardsSnapshot().cards.find((card) => card.id === creditCard.id),
+      });
+    }
+
+    const updateCreditCardMatch = pathname.match(/^\/api\/v1\/credit-cards\/([^/]+)$/);
+
+    if (updateCreditCardMatch && method === 'PUT') {
+      const creditCardId = updateCreditCardMatch[1] ?? '';
+      const payload = JSON.parse(String(init?.body)) as {
+        name: string;
+        creditLimitInCents: number;
+        statementClosingDay: number;
+        dueDay: number;
+        paymentAccountId: string;
+      };
+
+      state.creditCards = state.creditCards.map((card) =>
+        card.id === creditCardId
+          ? {
+              ...card,
+              ...payload,
+              updatedAt: '2026-05-06T12:20:00.000Z',
+            }
+          : card,
+      );
+
+      return mockJsonResponse({
+        creditCard: buildCreditCardsSnapshot().cards.find((card) => card.id === creditCardId),
+      });
+    }
+
+    if (pathname === '/api/v1/credit-card-purchases' && method === 'POST') {
+      const payload = JSON.parse(String(init?.body)) as {
+        creditCardId: string;
+        description: string;
+        category?: string;
+        amountInCents: number;
+        purchaseDate: string;
+      };
+      const purchase: CreditCardPurchase = {
+        id:
+          state.purchases.length === 0
+            ? 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+            : 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        creditCardId: payload.creditCardId,
+        description: payload.description,
+        category: payload.category,
+        amountInCents: payload.amountInCents,
+        purchaseDate: payload.purchaseDate,
+        createdAt: '2026-05-06T12:30:00.000Z',
+        updatedAt: '2026-05-06T12:30:00.000Z',
+      };
+
+      state.purchases = [...state.purchases, purchase];
+
+      return mockJsonResponse({
+        purchase: buildCreditCardsSnapshot().purchases.find(
+          (item) => item.id === purchase.id,
+        ),
+      });
+    }
+
+    const updatePurchaseMatch = pathname.match(/^\/api\/v1\/credit-card-purchases\/([^/]+)$/);
+
+    if (updatePurchaseMatch && method === 'PUT') {
+      const purchaseId = updatePurchaseMatch[1] ?? '';
+      const payload = JSON.parse(String(init?.body)) as {
+        creditCardId: string;
+        description: string;
+        category?: string;
+        amountInCents: number;
+        purchaseDate: string;
+      };
+
+      state.purchases = state.purchases.map((purchase) =>
+        purchase.id === purchaseId
+          ? {
+              ...purchase,
+              ...payload,
+              updatedAt: '2026-05-06T12:40:00.000Z',
+            }
+          : purchase,
+      );
+
+      return mockJsonResponse({
+        purchase: buildCreditCardsSnapshot().purchases.find(
+          (item) => item.id === purchaseId,
+        ),
+      });
+    }
+
+    if (pathname === '/api/v1/contracts' && method === 'GET') {
+      return mockJsonResponse({ snapshot: emptyContractsSnapshot });
+    }
+
+    if (pathname === '/api/v1/horizon' && method === 'GET') {
+      return mockJsonResponse({ snapshot: buildHorizonSnapshot() });
+    }
+
+    return mockJsonResponse({});
+  });
+}
+
 describe('App', () => {
   afterEach(() => {
     queryClient.clear();
@@ -818,6 +1139,194 @@ describe('App', () => {
     expect(
       within(inactiveContractsCard as HTMLElement).getByText('Academia premium'),
     ).toBeInTheDocument();
+  });
+
+  it('gerencia cartoes e projeta a fatura no mes de vencimento pela shell web', async () => {
+    window.history.pushState({}, '', '/app/contas');
+
+    mockCreditCardShellFlow();
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Contas e saldo atual' }),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByPlaceholderText('Conta principal'), {
+      target: { value: 'Conta Cartao Web' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('0'), {
+      target: { value: '500000' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Conta Cartao Web')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('link', { name: 'Cartoes' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', {
+          name: 'Cartoes de credito e ciclo de fatura',
+        }),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByPlaceholderText('Ex.: Visa Platinum'), {
+      target: { value: 'Visa Corporativo' },
+    });
+    fireEvent.change(screen.getByLabelText('Limite em centavos'), {
+      target: { value: '300000' },
+    });
+    fireEvent.change(screen.getByLabelText('Fechamento'), {
+      target: { value: '25' },
+    });
+    fireEvent.change(screen.getByLabelText('Vencimento'), {
+      target: { value: '8' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Criar cartao' }));
+
+    const cardsSection = screen
+      .getByRole('heading', { name: 'Visao atual de limite, ciclo e fatura' })
+      .closest('article');
+
+    expect(cardsSection).not.toBeNull();
+
+    await waitFor(() => {
+      expect(
+        within(cardsSection as HTMLElement).getByText('Visa Corporativo'),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Editar cartao' }));
+    fireEvent.change(screen.getByPlaceholderText('Ex.: Visa Platinum'), {
+      target: { value: 'Visa Corporativo Black' },
+    });
+    fireEvent.change(screen.getByLabelText('Limite em centavos'), {
+      target: { value: '450000' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Atualizar cartao' }));
+
+    await waitFor(() => {
+      expect(
+        within(cardsSection as HTMLElement).getByText('Visa Corporativo Black'),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByPlaceholderText('Ex.: notebook'), {
+      target: { value: 'Notebook trabalho' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Ex.: tecnologia'), {
+      target: { value: 'Tecnologia' },
+    });
+    fireEvent.change(screen.getByLabelText('Valor em centavos'), {
+      target: { value: '50000' },
+    });
+    fireEvent.change(screen.getByLabelText('Data da compra'), {
+      target: { value: '2026-05-20' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Criar compra' }));
+
+    const purchasesSection = screen
+      .getByRole('heading', { name: 'Compras no credito' })
+      .closest('article');
+
+    expect(purchasesSection).not.toBeNull();
+
+    await waitFor(() => {
+      expect(
+        within(purchasesSection as HTMLElement).getByText('Notebook trabalho'),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Editar compra' }));
+    fireEvent.change(screen.getByPlaceholderText('Ex.: notebook'), {
+      target: { value: 'Notebook trabalho ajustado' },
+    });
+    fireEvent.change(screen.getByLabelText('Valor em centavos'), {
+      target: { value: '60000' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Atualizar compra' }));
+
+    await waitFor(() => {
+      expect(
+        within(purchasesSection as HTMLElement).getByText(
+          'Notebook trabalho ajustado',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByPlaceholderText('Ex.: notebook'), {
+      target: { value: 'Passagem executiva' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Ex.: tecnologia'), {
+      target: { value: 'Viagem' },
+    });
+    fireEvent.change(screen.getByLabelText('Valor em centavos'), {
+      target: { value: '25000' },
+    });
+    fireEvent.change(screen.getByLabelText('Data da compra'), {
+      target: { value: '2026-05-26' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Criar compra' }));
+
+    const projectedInvoicesSection = screen
+      .getByRole('heading', { name: 'Proximos vencimentos' })
+      .closest('article');
+
+    expect(projectedInvoicesSection).not.toBeNull();
+
+    await waitFor(() => {
+      expect(
+        within(purchasesSection as HTMLElement).getByText('Passagem executiva'),
+      ).toBeInTheDocument();
+      expect(
+        within(projectedInvoicesSection as HTMLElement).getByText(/08\/06\/2026/),
+      ).toBeInTheDocument();
+      expect(
+        within(projectedInvoicesSection as HTMLElement).getByText(/08\/07\/2026/),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('link', { name: 'Visao geral' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', {
+          name: 'Horizonte oficial de 24 meses no backend.',
+        }),
+      ).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('2026-05-01')).toBeInTheDocument();
+      expect(screen.getByText('2026-06-01')).toBeInTheDocument();
+      expect(screen.getByText('2026-07-01')).toBeInTheDocument();
+    });
+
+    const mayCard = screen.getByText('2026-05-01').closest('.horizon-list-card');
+    const juneCard = screen.getByText('2026-06-01').closest('.horizon-list-card');
+    const julyCard = screen.getByText('2026-07-01').closest('.horizon-list-card');
+
+    expect(mayCard).not.toBeNull();
+    expect(juneCard).not.toBeNull();
+    expect(julyCard).not.toBeNull();
+
+    const mayExpense = within(mayCard as HTMLElement).getByText('Saidas').closest('div');
+    const juneExpense = within(juneCard as HTMLElement).getByText('Saidas').closest('div');
+    const julyExpense = within(julyCard as HTMLElement).getByText('Saidas').closest('div');
+
+    expect(mayExpense).not.toBeNull();
+    expect(juneExpense).not.toBeNull();
+    expect(julyExpense).not.toBeNull();
+
+    expect(within(mayExpense as HTMLElement).getByText(/R\$\s*0,00/)).toBeInTheDocument();
+    expect(within(juneExpense as HTMLElement).getByText(/R\$\s*600,00/)).toBeInTheDocument();
+    expect(within(julyExpense as HTMLElement).getByText(/R\$\s*250,00/)).toBeInTheDocument();
   });
 
   it('mostra a tela de cadastro com o consentimento obrigatorio', async () => {

@@ -2,12 +2,17 @@ import type { FastifyPluginAsync } from 'fastify';
 
 import {
   archiveAccountInputSchema,
+  createCreditCardInputSchema,
+  createCreditCardPurchaseInputSchema,
   createAccountInputSchema,
   createContractAdjustmentInputSchema,
   createContractInputSchema,
   createTransactionInputSchema,
   accountsSnapshotSchema,
   accountListItemSchema,
+  creditCardListItemSchema,
+  creditCardPurchaseListItemSchema,
+  creditCardsSnapshotSchema,
   contractAdjustmentSchema,
   contractSchema,
   contractsSnapshotSchema,
@@ -16,6 +21,8 @@ import {
   horizonSnapshotSchema,
   manualTransactionSchema,
   transactionsSnapshotSchema,
+  updateCreditCardInputSchema,
+  updateCreditCardPurchaseInputSchema,
   updateContractInputSchema,
   updateHorizonSettingsInputSchema,
   updateAccountInputSchema,
@@ -51,6 +58,18 @@ const transactionsSnapshotResponseSchema = z.object({
 
 const contractsSnapshotResponseSchema = z.object({
   snapshot: contractsSnapshotSchema,
+});
+
+const creditCardsSnapshotResponseSchema = z.object({
+  snapshot: creditCardsSnapshotSchema,
+});
+
+const creditCardResponseSchema = z.object({
+  creditCard: creditCardListItemSchema,
+});
+
+const creditCardPurchaseResponseSchema = z.object({
+  purchase: creditCardPurchaseListItemSchema,
 });
 
 const contractResponseSchema = z.object({
@@ -117,6 +136,17 @@ export function financeRoutes(financeService: FinanceService): FastifyPluginAsyn
       return reply.send(contractsSnapshotResponseSchema.parse({ snapshot }));
     });
 
+    app.get('/api/v1/credit-cards', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const snapshot = await financeService.getCreditCardsSnapshot(
+        authorizedSession.userId,
+      );
+
+      return reply.send(creditCardsSnapshotResponseSchema.parse({ snapshot }));
+    });
+
     app.post('/api/v1/accounts', async (request, reply) => {
       const authorizedSession = await financeService.requireAuthorizedSession(
         request.cookies[env.SESSION_COOKIE_NAME],
@@ -163,6 +193,58 @@ export function financeRoutes(financeService: FinanceService): FastifyPluginAsyn
       );
 
       return reply.code(201).send(contractResponseSchema.parse({ contract }));
+    });
+
+    app.post('/api/v1/credit-cards', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const parsedBody = createCreditCardInputSchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedBody.error.flatten(),
+        );
+      }
+
+      const creditCard = await financeService.createCreditCard(
+        authorizedSession.userId,
+        parsedBody.data,
+        getRequestContext(request),
+      );
+
+      return reply.code(201).send(
+        creditCardResponseSchema.parse({ creditCard }),
+      );
+    });
+
+    app.post('/api/v1/credit-card-purchases', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const parsedBody = createCreditCardPurchaseInputSchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedBody.error.flatten(),
+        );
+      }
+
+      const purchase = await financeService.createCreditCardPurchase(
+        authorizedSession.userId,
+        parsedBody.data,
+        getRequestContext(request),
+      );
+
+      return reply.code(201).send(
+        creditCardPurchaseResponseSchema.parse({ purchase }),
+      );
     });
 
     app.put('/api/v1/accounts/:id', async (request, reply) => {
@@ -239,6 +321,44 @@ export function financeRoutes(financeService: FinanceService): FastifyPluginAsyn
       );
 
       return reply.send(contractResponseSchema.parse({ contract }));
+    });
+
+    app.put('/api/v1/credit-cards/:id', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const parsedParams = idParamSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedParams.error.flatten(),
+        );
+      }
+
+      const parsedBody = createCreditCardInputSchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedBody.error.flatten(),
+        );
+      }
+
+      const creditCard = await financeService.updateCreditCard(
+        authorizedSession.userId,
+        updateCreditCardInputSchema.parse({
+          ...parsedBody.data,
+          id: parsedParams.data.id,
+        }),
+        getRequestContext(request),
+      );
+
+      return reply.send(creditCardResponseSchema.parse({ creditCard }));
     });
 
     app.post('/api/v1/accounts/:id/archive', async (request, reply) => {
@@ -341,6 +461,44 @@ export function financeRoutes(financeService: FinanceService): FastifyPluginAsyn
       );
 
       return reply.send(contractResponseSchema.parse({ contract }));
+    });
+
+    app.put('/api/v1/credit-card-purchases/:id', async (request, reply) => {
+      const authorizedSession = await financeService.requireAuthorizedSession(
+        request.cookies[env.SESSION_COOKIE_NAME],
+      );
+      const parsedParams = idParamSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedParams.error.flatten(),
+        );
+      }
+
+      const parsedBody = createCreditCardPurchaseInputSchema.safeParse(request.body);
+
+      if (!parsedBody.success) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Dados invalidos.',
+          parsedBody.error.flatten(),
+        );
+      }
+
+      const purchase = await financeService.updateCreditCardPurchase(
+        authorizedSession.userId,
+        updateCreditCardPurchaseInputSchema.parse({
+          ...parsedBody.data,
+          id: parsedParams.data.id,
+        }),
+        getRequestContext(request),
+      );
+
+      return reply.send(creditCardPurchaseResponseSchema.parse({ purchase }));
     });
 
     app.get('/api/v1/transactions', async (request, reply) => {
