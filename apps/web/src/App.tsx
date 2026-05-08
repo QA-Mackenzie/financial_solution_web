@@ -4,8 +4,18 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { PublicOnlyRoute } from './components/PublicOnlyRoute';
+import { AccountsPage } from './features/accounts/AccountsPage';
 import { AuthPage } from './features/auth/AuthPage';
+import { PasswordRecoveryPage } from './features/auth/PasswordRecoveryPage';
+import { PasswordResetPage } from './features/auth/PasswordResetPage';
+import { ContractsPage } from './features/contracts/ContractsPage';
+import { CreditCardsPage } from './features/creditCards/CreditCardsPage';
+import { AnalyticsPage } from './features/dashboard/AnalyticsPage';
+import { AccessPage } from './features/dashboard/AccessPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
+import { InstallmentsPage } from './features/installments/InstallmentsPage';
+import { ProvisionsPage } from './features/provisions/ProvisionsPage';
+import { TransactionsPage } from './features/transactions/TransactionsPage';
 import { queryClient } from './lib/query-client';
 
 function LandingPage() {
@@ -36,6 +46,22 @@ export function App() {
           />
           <Route
             element={
+              <PublicOnlyRoute>
+                <PasswordRecoveryPage />
+              </PublicOnlyRoute>
+            }
+            path="/esqueci-senha"
+          />
+          <Route
+            element={
+              <PublicOnlyRoute>
+                <PasswordResetPage />
+              </PublicOnlyRoute>
+            }
+            path="/redefinir-senha"
+          />
+          <Route
+            element={
               <ProtectedRoute>
                 <AppShell>
                   <DashboardPage />
@@ -43,6 +69,86 @@ export function App() {
               </ProtectedRoute>
             }
             path="/app"
+          />
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <AccountsPage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+            path="/app/contas"
+          />
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <TransactionsPage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+            path="/app/lancamentos"
+          />
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <ContractsPage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+            path="/app/contratos"
+          />
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <CreditCardsPage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+            path="/app/cartoes"
+          />
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <InstallmentsPage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+            path="/app/parcelamentos"
+          />
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <ProvisionsPage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+            path="/app/provisoes"
+          />
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <AnalyticsPage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+            path="/app/analytics"
+          />
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <AccessPage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+            path="/app/acesso"
           />
           <Route element={<Navigate replace to="/" />} path="*" />
         </Routes>

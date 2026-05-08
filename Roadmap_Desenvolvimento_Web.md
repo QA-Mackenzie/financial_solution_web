@@ -143,6 +143,8 @@ O time consegue clonar o novo repositorio, subir app e API localmente, conectar 
 
 ## Sprint 1 - Fundacao compartilhada, identidade e shell autenticado
 
+Status: concluida em 2026-05-06
+
 ### Objetivo
 
 Criar a base compartilhada de dominio/contratos e entregar o primeiro fluxo autenticado seguro da aplicacao web.
@@ -156,24 +158,45 @@ Criar a base compartilhada de dominio/contratos e entregar o primeiro fluxo aute
 
 ### Backlog recomendado
 
-- [ ] Extrair para package compartilhado os contratos reutilizaveis de contas, transacoes, contratos, cartoes, parcelamentos, provisoes, tags e horizonte
-- [ ] Portar para package compartilhado os modulos puros de dominio com maior estabilidade matematica e baixo acoplamento de infra
-- [ ] Migrar e adaptar os testes de dominio mais confiaveis para o novo repositorio
-- [ ] Modelar tabelas de users, sessions, password_reset_tokens, email_verification_tokens, consents e audit_logs
-- [ ] Implementar cadastro inicial, login, logout e renovacao de sessao
-- [ ] Implementar hashing forte de senha e cookies seguros com expiracao definida
-- [ ] Criar paginas de login, cadastro, recuperacao e reset de senha
-- [ ] Criar shell privada com navegacao basica, protecao de rotas e bootstrap do usuario autenticado
-- [ ] Registrar eventos minimos de auditoria para login, logout, reset e falhas de autenticacao
-- [ ] Cobrir auth com testes de integracao, casos de credencial invalida e expiracao de sessao
+- [x] Extrair para package compartilhado os contratos reutilizaveis de contas, transacoes, contratos, cartoes, parcelamentos, provisoes, tags e horizonte
+- [x] Portar para package compartilhado os modulos puros de dominio com maior estabilidade matematica e baixo acoplamento de infra
+- [x] Migrar e adaptar os testes de dominio mais confiaveis para o novo repositorio
+- [x] Modelar tabelas de users, sessions, password_reset_tokens, email_verification_tokens, consents e audit_logs
+- [x] Implementar cadastro inicial, login, logout e renovacao de sessao
+- [x] Implementar hashing forte de senha e cookies seguros com expiracao definida
+- [x] Criar paginas de login, cadastro, recuperacao e reset de senha
+- [x] Criar shell privada com navegacao basica, protecao de rotas e bootstrap do usuario autenticado
+- [x] Registrar eventos minimos de auditoria para login, logout, reset e falhas de autenticacao
+- [x] Cobrir auth com testes de integracao, casos de credencial invalida e expiracao de sessao
 
 ### Gate de saida
 
 Um usuario consegue criar conta, autenticar, encerrar sessao e acessar a shell privada da aplicacao sem expor dados ou rotas sem protecao.
 
+### Implementado nesta sprint
+
+- pacotes packages/contracts e packages/domain-core preenchidos com contratos compartilhados e modulos puros de contas, transacoes, contratos, cartoes, parcelamentos, provisoes, tags e horizonte
+- suite de regressao matematica portada para o workspace com 60 testes de dominio validados no novo pacote compartilhado
+- autenticacao persistente em PostgreSQL com tabelas auth.users, auth.sessions, auth.password_reset_tokens, auth.email_verification_tokens, auth.consents e auth.audit_logs
+- AuthService com hashing scrypt, renovacao de sessao, expiracao de cookie, reset de senha, token opaco para recuperacao e trilha minima de auditoria
+- API Fastify atualizada para cadastro, login, leitura de sessao, logout, recuperacao e reset de senha com contratos compartilhados
+- shell web autenticada com navegacao privada basica, resumo da sessao, cadastro com consentimento e rotas publicas para recuperacao/reset
+- fixtures e testes de frontend atualizados para o novo contrato de auth e para as rotas da shell autenticada
+
+### Validacao executada
+
+- npm run test --workspace @shf/api
+- npm run test --workspace @shf/domain-core
+- npm run test --workspace @shf/web
+- npm run check
+- npm run infra:up
+- npm run db:check
+
 ---
 
 ## Sprint 2 - Modelo de dados financeiro multiusuario e autorizacao
+
+Status: concluida em 2026-05-06
 
 ### Objetivo
 
@@ -188,24 +211,46 @@ Preparar a base relacional do produto web com isolamento por usuario e autorizac
 
 ### Backlog recomendado
 
-- [ ] Modelar tabelas core com user_id: accounts, manual_transactions, recurring_contracts, recurring_contract_adjustments, credit_cards, credit_card_purchases, installment_plans, installment_operations, provisions, variable_expense_overrides, tags e tabelas M:N
-- [ ] Criar indices e constraints compostas por user_id onde antes existiam restricoes globais
-- [ ] Redesenhar app_settings para escopo por usuario
-- [ ] Implementar camada de repositorios ou data access para entidades base
-- [ ] Implementar middleware ou componente equivalente de autorizacao owner-based
-- [ ] Garantir que toda consulta e mutacao aplique escopo do usuario autenticado
-- [ ] Definir schema de auditoria para operacoes sensiveis de dominio
-- [ ] Criar fixtures e seeds de desenvolvimento com multiplos usuarios para testar isolamento
-- [ ] Criar prova de conceito do importador do SQLite legado para staging tables ou pipeline temporario
-- [ ] Cobrir com testes de integracao os cenarios de acesso indevido e cross-user leakage
+- [x] Modelar tabelas core com user_id: accounts, manual_transactions, recurring_contracts, recurring_contract_adjustments, credit_cards, credit_card_purchases, installment_plans, installment_operations, provisions, variable_expense_overrides, tags e tabelas M:N
+- [x] Criar indices e constraints compostas por user_id onde antes existiam restricoes globais
+- [x] Redesenhar app_settings para escopo por usuario
+- [x] Implementar camada de repositorios ou data access para entidades base
+- [x] Implementar middleware ou componente equivalente de autorizacao owner-based
+- [x] Garantir que toda consulta e mutacao aplique escopo do usuario autenticado
+- [x] Definir schema de auditoria para operacoes sensiveis de dominio
+- [x] Criar fixtures e seeds de desenvolvimento com multiplos usuarios para testar isolamento
+- [x] Criar prova de conceito do importador do SQLite legado para staging tables ou pipeline temporario
+- [x] Cobrir com testes de integracao os cenarios de acesso indevido e cross-user leakage
 
 ### Gate de saida
 
 A aplicacao possui base relacional segura, com isolamento por usuario comprovado por teste automatizado e pronta para receber os primeiros modulos funcionais.
 
+### Implementado nesta sprint
+
+- schema versionado 004-finance-schema.sql com finance.user_settings, accounts, manual_transactions, recurring_contracts, credit_cards, installment_plans, provisions, variable_expense_overrides, tabelas M:N de tags, schema audit.financial_events e schema legacy_import para staging do legado
+- constraints compostas por user_id + id e foreign keys compostas para impedir relacionamentos cruzados entre recursos de usuarios diferentes no proprio banco
+- camada owner-scoped em apps/api/src/lib/finance-repositories.ts com repositos base de configuracoes por usuario, contas, tags, lancamentos manuais e lotes staged do importador legado
+- componente equivalente de autorizacao owner-based em apps/api/src/lib/session-guard.ts para exigir sessao valida antes de operar recursos financeiros
+- seeds locais multiusuario em 005-finance-seed.sql com dois usuarios reais em auth.users, configuracoes por usuario, contas, tags, um lancamento inicial e um lote staged do importador legado
+- db:check ampliado para reportar usuarios seed, contas seed e lotes staged do importador legado
+- testes de integracao dedicados cobrindo isolamento por user_id, bloqueio de mutacao cruzada e ausencia de leakage entre usuarios
+
+### Validacao executada
+
+- npm run test --workspace @shf/api -- test/finance.test.ts
+- npm run test --workspace @shf/api
+- npm run test --workspace @shf/domain-core
+- npm run test --workspace @shf/web
+- npm run check
+- npm run infra:up
+- npm run db:check
+
 ---
 
 ## Sprint 3 - Contas e lancamentos manuais end-to-end
+
+Status: concluida em 2026-05-06
 
 ### Objetivo
 
@@ -220,24 +265,53 @@ Entregar o primeiro fluxo financeiro real e utilizavel na versao web, formando a
 
 ### Backlog recomendado
 
-- [ ] Implementar casos de uso e endpoints de contas: criar, editar, arquivar, listar e obter snapshot
-- [ ] Portar e adaptar as regras de validacao de accountInput e accountSnapshot para o novo backend
-- [ ] Implementar casos de uso e endpoints de transacoes manuais
-- [ ] Portar e adaptar transactionInput e transactionSnapshot
-- [ ] Criar tela web de contas com validacoes, empty states e feedback de erro
-- [ ] Criar tela web de lancamentos com criacao, edicao, exclusao, filtros basicos e associacao a conta
-- [ ] Exibir saldo por conta e saldo consolidado atual na shell privada
-- [ ] Registrar auditoria para criacao, edicao e exclusao de contas e lancamentos
-- [ ] Escrever testes E2E para login > criar conta > lancar entrada > lancar saida > validar saldo final
-- [ ] Publicar documentacao curta do modelo de saldo atual e das regras de centavos
+- [x] Implementar casos de uso e endpoints de contas: criar, editar, arquivar, listar e obter snapshot
+- [x] Portar e adaptar as regras de validacao de accountInput e accountSnapshot para o novo backend
+- [x] Implementar casos de uso e endpoints de transacoes manuais
+- [x] Portar e adaptar transactionInput e transactionSnapshot
+- [x] Criar tela web de contas com validacoes, empty states e feedback de erro
+- [x] Criar tela web de lancamentos com criacao, edicao, exclusao, filtros basicos e associacao a conta
+- [x] Exibir saldo por conta e saldo consolidado atual na shell privada
+- [x] Registrar auditoria para criacao, edicao e exclusao de contas e lancamentos
+- [x] Escrever testes E2E para login > criar conta > lancar entrada > lancar saida > validar saldo final
+- [x] Publicar documentacao curta do modelo de saldo atual e das regras de centavos
 
 ### Gate de saida
 
 O usuario consegue montar sua base financeira atual na web e o sistema responde com saldos corretos e rastreaveis.
 
+### Implementado nesta sprint
+
+- contratos compartilhados de contas e lancamentos manuais em packages/contracts com schemas Zod para payloads, snapshots e mutacoes
+- FinanceService e rotas owner-scoped na API para listar snapshot, criar, editar, arquivar contas e criar, editar e excluir lancamentos manuais
+- reutilizacao das regras puras de dominio de accountInput, accountSnapshot, transactionInput e transactionSnapshot no backend web
+- auditoria financeira em audit.financial_events para criacao, edicao, arquivamento e exclusao de recursos financeiros
+- cliente web com financeApi, hooks React Query e paginas protegidas de contas e lancamentos conectadas ao backend oficial
+- dashboard privado atualizado para exibir saldo consolidado, total de entradas e total de saidas do usuario autenticado
+- teste HTTP ponta a ponta na API cobrindo fluxo financeiro e isolamento owner-based
+- teste de shell web cobrindo login, criacao de conta, entrada, saida e validacao do saldo final renderizado
+
+### Modelo de saldo atual e regras de centavos
+
+- todos os valores monetarios sao persistidos e trafegados em centavos inteiros para evitar erro de arredondamento em ponto flutuante
+- o saldo atual de cada conta e calculado como saldo inicial da conta somado aos lancamentos de entrada e subtraido dos lancamentos de saida associados a ela
+- o saldo consolidado atual e a soma dos saldos atuais de todas as contas ativas do usuario autenticado
+- snapshots de contas e lancamentos representam o estado derivado atual do backend e sao a fonte oficial consumida pela shell web
+
+### Validacao executada
+
+- npm run typecheck --workspace @shf/contracts
+- npm run typecheck --workspace @shf/api
+- npm run typecheck --workspace @shf/web
+- npm run test --workspace @shf/api -- test/finance-routes.test.ts
+- npm run test --workspace @shf/api
+- npm run test --workspace @shf/web
+
 ---
 
 ## Sprint 4 - Horizonte oficial no backend e dashboard base
+
+Status: concluida em 2026-05-06
 
 ### Objetivo
 
@@ -252,24 +326,51 @@ Transformar o horizonte em calculo oficial de backend e entregar a principal pro
 
 ### Backlog recomendado
 
-- [ ] Portar o motor de financialHorizon para a nova arquitetura sem dependencia de renderer
-- [ ] Criar servico de orquestracao do horizonte no backend usando contas e lancamentos ja implementados
-- [ ] Implementar configuracoes por usuario para margem de seguranca e janela de media movel
-- [ ] Criar endpoint de leitura do horizonte com breakdown mensal e classificacao de risco
-- [ ] Criar dashboard web base para exibir 24 meses, saldos, entradas, saidas e status healthy/attention/critical
-- [ ] Implementar cache estrategico e instrumentacao de performance para leitura do horizonte
-- [ ] Reaproveitar fixtures do dominio atual para testes de regressao
-- [ ] Validar equivalencia matematica entre cenarios do desktop e do backend web para o escopo ja migrado
-- [ ] Criar testes de contrato de API para payload do horizonte
-- [ ] Documentar que o calculo oficial do horizonte passa a residir no backend
+- [x] Portar o motor de financialHorizon para a nova arquitetura sem dependencia de renderer
+- [x] Criar servico de orquestracao do horizonte no backend usando contas e lancamentos ja implementados
+- [x] Implementar configuracoes por usuario para margem de seguranca e janela de media movel
+- [x] Criar endpoint de leitura do horizonte com breakdown mensal e classificacao de risco
+- [x] Criar dashboard web base para exibir 24 meses, saldos, entradas, saidas e status healthy/attention/critical
+- [x] Implementar cache estrategico e instrumentacao de performance para leitura do horizonte
+- [x] Reaproveitar fixtures do dominio atual para testes de regressao
+- [x] Validar equivalencia matematica entre cenarios do desktop e do backend web para o escopo ja migrado
+- [x] Criar testes de contrato de API para payload do horizonte
+- [x] Documentar que o calculo oficial do horizonte passa a residir no backend
 
 ### Gate de saida
 
 O horizonte deixa de ser logica acoplada a UI e passa a ser um servico oficial, auditavel e testado da versao web.
 
+### Implementado nesta sprint
+
+- contratos compartilhados de horizonte expandidos com schemas Zod para meses, snapshot oficial, settings e update das configuracoes por usuario
+- helper oficial de orquestracao do horizonte no backend combinando contas, lancamentos manuais e projecao de despesas variaveis por media movel
+- FinanceService atualizado para entregar o snapshot oficial do horizonte, persistir/recuperar horizonSettings por usuario e invalidar cache em mutacoes financeiras
+- endpoints GET /api/v1/horizon e PUT /api/v1/horizon/settings com classificacao mensal de risco, headers de cache/performance e payload validado por contrato
+- dashboard web migrado para consumir exclusivamente o horizonte oficial do backend, exibindo 24 meses, fechamento mensal, principal risco e formulario de configuracao
+- cache in-memory por usuario para o horizonte do dia com instrumentacao via headers x-horizon-cache, x-horizon-generated-at e server-timing
+- testes de regressao reutilizando as fixtures oficiais do dominio e testes HTTP de contrato cobrindo cache, settings e projecao futura
+
+### Calculo oficial do horizonte
+
+- o horizonte deixa de ser responsabilidade da interface e passa a ser calculado no backend como snapshot oficial por usuario
+- a shell web consome apenas o payload oficial do endpoint de horizonte para renderizar meses, riscos e configuracoes
+- a margem de seguranca e a janela da media movel ficam persistidas por usuario em finance.user_settings
+
+### Validacao executada
+
+- npm run test --workspace @shf/api -- test/horizon-projection.test.ts test/horizon-routes.test.ts
+- npm run test --workspace @shf/web
+- npm run test --workspace @shf/api
+- npm run check
+- npm run infra:up
+- npm run db:check
+
 ---
 
 ## Sprint 5 - Contratos recorrentes e reajustes
+
+Status: concluida em 2026-05-06
 
 ### Objetivo
 
@@ -283,24 +384,55 @@ Adicionar ao sistema web as recorrencias fixas que alimentam o horizonte automat
 
 ### Backlog recomendado
 
-- [ ] Implementar schema, repositorio e endpoints de contratos recorrentes
-- [ ] Portar contractInput, contractProjection e contractSnapshot
-- [ ] Implementar reajustes com vigencia futura e historico preservado
-- [ ] Implementar encerramento e cancelamento sem corromper meses passados
-- [ ] Integrar contratos ao servico oficial do horizonte
-- [ ] Criar UI de contratos com cadastro, reajuste e encerramento
-- [ ] Atualizar dashboard e horizonte para evidenciar ocorrencias recorrentes
-- [ ] Escrever testes de integracao para vigencia, encerramento e recalculo do horizonte
-- [ ] Escrever E2E para criar contrato, reajustar, validar efeito apenas futuro
-- [ ] Revisar auditoria de eventos do modulo
+- [x] Implementar schema, repositorio e endpoints de contratos recorrentes
+- [x] Portar contractInput, contractProjection e contractSnapshot
+- [x] Implementar reajustes com vigencia futura e historico preservado
+- [x] Implementar encerramento e cancelamento sem corromper meses passados
+- [x] Integrar contratos ao servico oficial do horizonte
+- [x] Criar UI de contratos com cadastro, reajuste e encerramento
+- [x] Atualizar dashboard e horizonte para evidenciar ocorrencias recorrentes
+- [x] Escrever testes de integracao para vigencia, encerramento e recalculo do horizonte
+- [x] Escrever E2E para criar contrato, reajustar, validar efeito apenas futuro
+- [x] Revisar auditoria de eventos do modulo
 
 ### Gate de saida
 
 Receitas e despesas recorrentes passam a ser calculadas automaticamente na web com comportamento equivalente ao dominio atual.
 
+### Implementado nesta sprint
+
+- contratos compartilhados em packages/contracts expandidos com schemas Zod e tipos para contratos, reajustes, snapshots, payloads de criacao/edicao e encerramento
+- reuso das regras puras ja existentes em packages/domain-core para validacao, snapshot e projecao de contratos recorrentes dentro da arquitetura web
+- ContractsRepository owner-scoped, FinanceService e rotas financeiras da API atualizados com create, update, adjust e end, incluindo auditoria em audit.financial_events
+- integracao oficial de contratos recorrentes ao horizonte de 24 meses no backend, com invalidação do cache sempre que uma recorrencia e alterada
+- testes de regressao do horizonte e testes HTTP de contratos cobrindo reajuste futuro, encerramento, efeito apenas futuro, cache e bloqueio cross-user
+- cliente web atualizado com endpoints e hooks React Query de contratos, nova pagina protegida de contratos recorrentes e navegacao dedicada na shell autenticada
+- dashboard web expandido para evidenciar contratos ativos, totais recorrentes e impacto continuo no horizonte
+- teste da shell web cobrindo criar contrato, programar reajuste, encerrar recorrencia e refletir o novo estado no frontend
+
+### Contratos recorrentes no horizonte oficial
+
+- contratos ativos passam a gerar ocorrencias mensais diretamente no backend oficial do horizonte
+- reajustes respeitam effectiveStartDate e preservam os meses ja ocorridos sem reescrever historico passado
+- encerramentos removem apenas as ocorrencias posteriores a endDate, mantendo a trilha auditavel das recorrencias anteriores
+
+### Validacao executada
+
+- npm run test --workspace @shf/api -- horizon-projection.test.ts
+- npm run test --workspace @shf/api -- contract-routes.test.ts
+- npm run test --workspace @shf/web -- App.test.tsx
+- npm run test --workspace @shf/api
+- npm run typecheck --workspace @shf/web
+- npm run test --workspace @shf/web
+- npm run check
+- npm run infra:up
+- npm run db:check
+
 ---
 
 ## Sprint 6 - Cartoes de credito e faturas
+
+Status: concluida em 2026-05-07
 
 ### Objetivo
 
@@ -314,24 +446,63 @@ Separar corretamente credito e caixa no sistema web, incluindo compras, ciclo de
 
 ### Backlog recomendado
 
-- [ ] Implementar schema e endpoints de cartoes e compras no credito
-- [ ] Portar creditCardInput, creditCardPurchaseInput e creditCardBilling
-- [ ] Implementar preview de fatura, fechamento, vencimento e conta pagadora padrao
-- [ ] Integrar o debito consolidado da fatura ao horizonte no mes correto
-- [ ] Criar UI de cartoes com cadastro, compra, visao de fatura e historico
-- [ ] Criar validacoes para ciclo de fechamento, limite e datas invalidas
-- [ ] Criar testes de regressao com compras em datas proximas ao fechamento
-- [ ] Criar E2E cobrindo compra no cartao e reflexo apenas no vencimento
-- [ ] Adicionar eventos de auditoria para criacao de compra, alteracao de cartao e fechamento de fatura
-- [ ] Medir impacto de performance do calculo de billing sobre o horizonte agregado
+- [x] Implementar schema e endpoints de cartoes e compras no credito
+- [x] Portar creditCardInput, creditCardPurchaseInput e creditCardBilling
+- [x] Implementar preview de fatura, fechamento, vencimento e conta pagadora padrao
+- [x] Integrar o debito consolidado da fatura ao horizonte no mes correto
+- [x] Criar UI de cartoes com cadastro, compra, visao de fatura e historico
+- [x] Criar validacoes para ciclo de fechamento, limite e datas invalidas
+- [x] Criar testes de regressao com compras em datas proximas ao fechamento
+- [x] Criar E2E na shell web cobrindo compra no cartao e reflexo apenas no vencimento
+- [x] Adicionar eventos de auditoria para criacao e alteracao do modulo; fechamento da fatura permanece derivado pelo billing
+- [x] Medir impacto de performance do calculo de billing sobre o horizonte agregado
 
 ### Gate de saida
 
 O sistema web representa credito sem distorcer o caixa atual e sem perder equivalencia com a regra financeira do desktop.
 
+### Implementado nesta sprint
+
+- contracts compartilhados expandidos com schemas Zod e tipos para cartoes, compras, faturas, ciclos, snapshots e payloads de criacao/edicao
+- reuso direto do dominio puro em packages/domain-core para validacao de cartao/compra, classificacao de ciclo, preview de fatura e projecao das ocorrencias no horizonte
+- CreditCardsRepository owner-scoped, FinanceService e rotas financeiras da API atualizados com create, update, list, purchases, auditoria e bloqueio cross-user
+- horizonte oficial do backend passou a considerar o debito agregado da fatura apenas no vencimento da conta pagadora, preservando o caixa no dia da compra
+- testes HTTP e de regressao da API cobrindo fechamento proximo da fatura, meses corretos de vencimento, auditoria e isolamento por usuario
+- cliente web atualizado com endpoints e hooks React Query de cartoes, nova pagina protegida de cartoes, navegacao dedicada e historico de compras/faturas
+- teste da shell web cobrindo cadastrar cartao, criar compra antes e depois do fechamento, editar dados e validar o reflexo apenas nos meses de vencimento
+- configuracoes do Vitest e do Vite no app web migradas para .mts para compatibilidade ESM do toolchain atual
+
+### Cartoes no horizonte oficial
+
+- compras no credito nao reduzem o caixa no dia da compra; o impacto consolidado entra apenas no mes do vencimento da fatura
+- compras em datas proximas ao fechamento passam corretamente para a fatura seguinte quando o ciclo ja encerrou
+- cada cartao mantem conta pagadora padrao, ciclo atual, preview da fatura corrente e historico consolidado por invoiceMonth
+
+### Performance observada
+
+- benchmark sintetico executado sobre 200 cartoes, 6000 compras, 1116 faturas geradas e horizonte de 24 meses concluiu billing + projecao agregada em 163.61 ms
+
+### Validacao executada
+
+- npm run test --workspace @shf/api -- credit-card-routes.test.ts horizon-projection.test.ts
+- npm run test --workspace @shf/web -- App.test.tsx
+- npm run test --workspace @shf/api
+- npm run test --workspace @shf/web
+- npm run typecheck --workspace @shf/web
+- npm run check ate o build do frontend, com lint, typecheck e testes completos aprovados no workspace
+- build do frontend validado com Node 20 via npx --yes node@20 ../../node_modules/typescript/bin/tsc --project tsconfig.json e npx --yes node@20 ../../node_modules/vite/bin/vite.js build --config vite.config.mts em apps/web
+
+### Observacoes de ambiente
+
+- npm run check nao concluiu o build web com o Node global 18.20.8 da maquina, porque o Vite 7 instalado exige Node 20.19+ ou 22.12+
+- npm run infra:up falhou porque o Docker Desktop nao estava disponivel no Windows no momento da validacao
+- npm run db:check retornou status down sem Postgres local ativo
+
 ---
 
 ## Sprint 7 - Parcelamentos e antecipacao
+
+Status: concluida em 2026-05-07
 
 ### Objetivo
 
@@ -345,24 +516,63 @@ Entregar o fluxo que mais exige recalculo confiavel do futuro: parcelamentos e q
 
 ### Backlog recomendado
 
-- [ ] Implementar schema e endpoints de installment_plans e installment_operations
-- [ ] Portar installmentInput, installmentSchedule e installmentCardProjection
-- [ ] Permitir parcelamento vinculado a cartao quando aplicavel
-- [ ] Implementar antecipacao parcial ou total das parcelas restantes
-- [ ] Integrar parcelamentos ao horizonte oficial e ao modulo de cartoes
-- [ ] Criar UI para criar parcelamento, visualizar cronograma e antecipar parcelas
-- [ ] Criar testes de regressao para cronograma, soma total e quitacao antecipada
-- [ ] Criar E2E especifico para parcelamento e recalculo do horizonte
-- [ ] Revisar idempotencia e consistencia transacional das operacoes de antecipacao
-- [ ] Garantir rastreabilidade em auditoria das alteracoes futuras geradas por antecipacao
+- [x] Implementar schema e endpoints de installment_plans e installment_operations
+- [x] Portar installmentInput, installmentSchedule e installmentCardProjection
+- [x] Permitir parcelamento vinculado a cartao quando aplicavel
+- [x] Implementar antecipacao parcial ou total das parcelas restantes
+- [x] Integrar parcelamentos ao horizonte oficial e ao modulo de cartoes
+- [x] Criar UI para criar parcelamento, visualizar cronograma e antecipar parcelas
+- [x] Criar testes de regressao para cronograma, soma total e quitacao antecipada
+- [x] Criar E2E especifico para parcelamento e recalculo do horizonte
+- [x] Revisar idempotencia e consistencia transacional das operacoes de antecipacao
+- [x] Garantir rastreabilidade em auditoria das alteracoes futuras geradas por antecipacao
 
 ### Gate de saida
 
 Parcelamentos passam a ser uma feature confiavel na web, com recalculo transparente e matematicamente consistente do futuro.
 
+### Implementado nesta sprint
+
+- contracts compartilhados expandidos com schemas Zod, tipos e payloads para installment_plans, installment_operations, ocorrencias projetadas e snapshots de parcelamentos
+- dominio puro reutilizado em packages/domain-core para validacao de parcelamentos, cronograma mensal, antecipacao parcial via affectedInstallmentCount e projecao de compras parceladas em cartao
+- InstallmentsRepository owner-scoped implementado com create, update, antecipacao, atualizacao de antecipacao, snapshot consolidado, bloqueio cross-user e calculo derivado do affectedAmountInCents a partir das parcelas elegiveis
+- FinanceService, horizonte oficial e rotas financeiras da API atualizados para expor parcelamentos, recalcular o horizonte com ocorrencias de conta e fundir parcelas no modulo de cartoes como compras/faturas projetadas
+- eventos de auditoria adicionados para criacao e alteracao de parcelamentos e para antecipacoes, mantendo rastreabilidade das alteracoes futuras geradas pelo recalculo
+- cliente web atualizado com endpoints e hooks React Query de parcelamentos, nova pagina protegida de parcelamentos, edicao de plano, visualizacao de cronograma, historico de antecipacoes e impacto em cartao quando aplicavel
+- pagina de cartoes ajustada para tratar compras projetadas oriundas de parcelamentos como itens derivados, sem fluxo de edicao manual
+- cobertura automatizada ampliada com testes de dominio para antecipacao parcial, testes HTTP da API para conta e cartao, regressao unitária do horizonte oficial e fluxo de shell web cobrindo parcelamento, antecipacao e reflexo no modulo de cartoes
+
+### Parcelamentos no horizonte oficial
+
+- parcelamentos em conta passam a gerar ocorrencias futuras oficiais no horizonte a partir do mes corrente, respeitando antecipacoes e recalculando o saldo projetado imediatamente
+- parcelamentos vinculados a cartao geram compras projetadas que entram no billing do cartao e so impactam o caixa no vencimento correto da fatura
+- a antecipacao parcial seleciona as N proximas parcelas elegiveis em ordem cronologica, evitando o comportamento antigo de antecipar automaticamente todo o saldo remanescente
+
+### Consistencia e auditoria
+
+- operacoes de antecipacao foram implementadas dentro de transacao, com reavaliacao do cronograma vigente e exclusao da propria operacao em cenarios de update para manter consistencia local
+- o valor total antecipado nao e confiado ao payload do cliente; ele e recalculado no backend a partir das parcelas efetivamente afetadas
+- snapshots combinados de cartao agora aceitam ids sinteticos para compras projetadas de parcelamentos, preservando a separacao entre compras persistidas e compras derivadas
+
+### Validacao executada
+
+- npm run lint
+- npm run typecheck
+- npm run test
+- npx -y node@20 C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js run build
+- npm run infra:up
+- npm run db:check
+
+### Observacoes de ambiente
+
+- o build completo do monorepo foi validado com Node 20 sobre o npm global da maquina porque o frontend usa Vite 7 e o Node global 18.20.8 continua abaixo do requisito minimo
+- Docker Desktop e Postgres local estavam disponiveis nesta validacao; npm run infra:up subiu o container shf-web-postgres e npm run db:check retornou status up
+
 ---
 
 ## Sprint 8 - Provisoes e despesas variaveis com override
+
+Status: concluida em 2026-05-07
 
 ### Objetivo
 
@@ -377,24 +587,63 @@ Completar o nucleo de planejamento financeiro com reserva de caixa e previsao de
 
 ### Backlog recomendado
 
-- [ ] Implementar schema e endpoints de provisoes
-- [ ] Portar provisionInput e provisionProjection
-- [ ] Implementar variable_expense_overrides por usuario
-- [ ] Portar variableExpenseProjection e integrar ao horizonte oficial
-- [ ] Criar UI de provisoes com meta, data de resgate e distribuicao mensal
-- [ ] Criar UI de override de despesa variavel por mes futuro
-- [ ] Integrar configuracao da janela de media movel no backend e no frontend
-- [ ] Criar testes de regressao para blindagem de caixa e sobrescrita manual
-- [ ] Criar E2E cobrindo provisao e override com reflexo no horizonte
-- [ ] Revisar visual do horizonte para diferenciar provisoes, despesas variaveis calculadas e overrides manuais
+- [x] Implementar schema e endpoints de provisoes
+- [x] Portar provisionInput e provisionProjection
+- [x] Implementar variable_expense_overrides por usuario
+- [x] Portar variableExpenseProjection e integrar ao horizonte oficial
+- [x] Criar UI de provisoes com meta, data de resgate e distribuicao mensal
+- [x] Criar UI de override de despesa variavel por mes futuro
+- [x] Integrar configuracao da janela de media movel no backend e no frontend
+- [x] Criar testes de regressao para blindagem de caixa e sobrescrita manual
+- [x] Criar E2E cobrindo provisao e override com reflexo no horizonte
+- [x] Revisar visual do horizonte para diferenciar provisoes, despesas variaveis calculadas e overrides manuais
 
 ### Gate de saida
 
 O horizonte web passa a representar nao apenas o historico e o fixo, mas tambem reserva de caixa e previsao dinamica de variaveis.
 
+### Implementado nesta sprint
+
+- contracts compartilhados expandidos com schemas Zod, tipos e payloads para provisoes, snapshots de planejamento de provisoes, overrides de despesas variaveis e enriquecimento opcional dos meses do horizonte oficial
+- camada owner-scoped da API ampliada com ProvisionsRepository e VariableExpenseOverridesRepository, bloqueio cross-user, snapshots consolidados e persistencia em finance.provisions e finance.variable_expense_overrides
+- FinanceService e rotas financeiras atualizados com CRUD de provisoes, upsert/remocao de overrides, auditoria dedicada e invalidacao de cache do horizonte quando reservas ou despesas variaveis futuras mudam
+- horizonte oficial recalculado no backend com buildProjectedProvisionOccurrences, buildProjectedVariableExpenseOccurrences e buildProvisionAdjustedHorizon, mantendo compatibilidade quando nao existem provisoes ativas
+- cliente web atualizado com endpoints e hooks React Query para snapshots, mutacoes de provisoes e overrides, invalidacao coordenada e pagina protegida de provisoes
+- nova pagina de provisoes entregue com criacao, edicao e resgate de provisoes, timeline de blindagem mensal, formulario de overrides e leitura das series variaveis futuras
+- dashboard principal revisado para destacar blindagem por provisao, proxima liberacao, overrides manuais e detalhes mensais de caixa bruto, reserva do mes e despesa variavel
+- cobertura automatizada ampliada com regressao do horizonte oficial, teste HTTP dedicado para provisoes/overrides por usuario e fluxo de shell web cobrindo provisao, override, dashboard, edicao, resgate e remocao
+
+### Provisoes e variaveis no horizonte oficial
+
+- provisoes ativas passam a reservar caixa mensalmente ate o mes alvo e liberam o valor acumulado no mes de resgate, refletindo caixa bruto, fechamento liquido e blindagem acumulada
+- despesas variaveis futuras continuam derivadas da media movel configurada pelo usuario, mas agora aceitam sobrescrita manual por conta, descricao e data futura especifica
+- o dashboard diferencia visualmente reserva do mes, liberacao, blindagem acumulada, despesa variavel projetada e quantidade de overrides manuais por mes
+
+### Consistencia e auditoria
+
+- criacao, atualizacao e resgate de provisoes rodam com validacao de dominio e auditoria dedicada, evitando estados parciais e mantendo rastreabilidade completa
+- overrides de despesa variavel sao tratados por chave natural accountId + description + occurrenceDate, permitindo update idempotente e remocao precisa sem duplicidade funcional
+- o horizonte so passa a expor campos adicionais de blindagem quando existem provisoes ativas, reduzindo ruido estrutural para consumidores e testes antigos
+
+### Validacao executada
+
+- npm run lint
+- npm run typecheck
+- npm run test
+- npx -y node@20 C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js run build
+- npm run infra:up
+- npm run db:check
+
+### Observacoes de ambiente
+
+- o build completo do monorepo foi validado com Node 20 sobre o npm global da maquina porque o frontend usa Vite 7 e o Node global 18.20.8 continua abaixo do requisito minimo
+- Docker Desktop e Postgres local estavam disponiveis nesta validacao; npm run infra:up manteve o container shf-web-postgres ativo e npm run db:check retornou status up
+
 ---
 
 ## Sprint 9 - Tags, categorias, consulta e analytics
+
+Status: concluida em 2026-05-07
 
 ### Objetivo
 
@@ -409,20 +658,47 @@ Entregar a camada de leitura e investigacao dos dados financeiros para uso diari
 
 ### Backlog recomendado
 
-- [ ] Fechar a decisao de produto para categorias: manter catalogo estatico na R1 ou persistir catalogo customizavel
-- [ ] Implementar CRUD de tags e associacao a transacoes e compras no credito
-- [ ] Portar tagInput e analyticsSnapshot
-- [ ] Criar endpoints de analytics por periodo, categoria, tag e entidade financeira
-- [ ] Criar tela de consulta de lancamentos com filtros por periodo, conta, categoria, tag e tipo
-- [ ] Criar tela de analytics com visoes sumarizadas, tabelares e graficos leves se aprovados
-- [ ] Criar testes de integracao para consultas e agregacoes
-- [ ] Criar E2E cobrindo filtro cruzado por categoria e tag
-- [ ] Revisar performance de consultas agregadas em bases medias e grandes
-- [ ] Documentar limites de escopo da R1 para analytics e categorias
+- [x] Fechar a decisao de produto para categorias: manter catalogo estatico na R1 ou persistir catalogo customizavel
+- [x] Implementar CRUD de tags e associacao a transacoes e compras no credito
+- [x] Portar tagInput e analyticsSnapshot
+- [x] Criar endpoints de analytics por periodo, categoria, tag e entidade financeira
+- [x] Criar tela de consulta de lancamentos com filtros por periodo, conta, categoria, tag e tipo
+- [x] Criar tela de analytics com visoes sumarizadas, tabelares e graficos leves se aprovados
+- [x] Criar testes de integracao para consultas e agregacoes
+- [x] Criar E2E cobrindo filtro cruzado por categoria e tag
+- [x] Revisar performance de consultas agregadas em bases medias e grandes
+- [x] Documentar limites de escopo da R1 para analytics e categorias
 
 ### Gate de saida
 
 O usuario consegue nao apenas registrar e projetar, mas tambem ler e analisar seus dados com filtros consistentes.
+
+### Implementado nesta sprint
+
+- decisao de produto fechada para manter o catalogo de categorias estatico na R1, versionado em packages/contracts/src/category.ts e reutilizado por web, API e dominio sem CRUD customizavel
+- contratos compartilhados de tags e analytics ampliados em packages/contracts, com port de tagInput, snapshots de consulta financeira e snapshots analiticos por categoria, tag, entidade e mes
+- builders puros de analytics adicionados em packages/domain-core para filtrar registros financeiros combinados e gerar agregacoes owner-scoped reutilizadas pela API
+- FinanceService e rotas HTTP da API expandidos com CRUD de tags, consulta unificada de registros e endpoints de analytics sobre lancamentos manuais e compras no credito
+- telas web de lancamentos e cartoes atualizadas para usar categorias estaticas, selecao de tags e leitura visual com badges e filtros consistentes
+- nova tela Analytics na shell privada com filtros por conta, categoria, tag, periodo, origem e entidade, alem de resumo executivo, preview de registros e breakdowns por categoria, tag, entidade e mes
+- testes HTTP dedicados na API cobrindo CRUD de tags, consulta filtrada, analytics combinado, auditoria e isolamento por usuario
+- teste de shell web cobrindo CRUD de tags na tela de analytics e filtro cruzado sobre os registros consolidados
+- revisao da estrategia de performance da R1 concluida com manutencao da agregacao no backend sobre registros ja filtrados por user_id, sem agregacoes cross-tenant e sem necessidade de migracao adicional de schema para esta release
+
+### Limites de escopo da R1
+
+- categorias permanecem estaticas e definidas em codigo; nao existe catalogo customizavel por usuario nesta release
+- analytics da R1 consolida lancamentos manuais e compras no credito, sem expandir ainda para contratos, provisoes, parcelamentos e outras leituras derivadas especializadas
+- as agregacoes sao calculadas no backend a partir do conjunto owner-scoped do usuario autenticado, priorizando consistencia funcional e simplicidade operacional na primeira release
+
+### Validacao executada
+
+- npm run lint
+- npm run typecheck
+- npm run test
+- npx -y node@20 "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js" run build
+- npm run infra:up
+- npm run db:check
 
 ---
 

@@ -14,6 +14,8 @@ type AuthPageProps = {
   mode: 'login' | 'register';
 };
 
+const consentVersion = import.meta.env.VITE_CONSENT_VERSION ?? '2026-05';
+
 export function AuthPage({ mode }: AuthPageProps) {
   const navigate = useNavigate();
   const loginMutation = useLoginMutation();
@@ -30,6 +32,8 @@ export function AuthPage({ mode }: AuthPageProps) {
     ),
     defaultValues: isRegisterMode
       ? {
+          consentAccepted: false,
+          consentVersion,
           name: '',
           email: '',
           password: '',
@@ -54,16 +58,15 @@ export function AuthPage({ mode }: AuthPageProps) {
   const nameError = isRegisterMode
     ? (errors as FieldErrors<RegisterInput>).name?.message
     : undefined;
+  const consentError = isRegisterMode
+    ? (errors as FieldErrors<RegisterInput>).consentAccepted?.message
+    : undefined;
 
   return (
     <main className="auth-page">
       <section className="auth-panel">
-        <div className="eyebrow">Sprint 0</div>
+        <div className="eyebrow">SHF Web</div>
         <h1>{isRegisterMode ? 'Crie sua conta' : 'Entre na plataforma'}</h1>
-        <p>
-          Base inicial da SHF Web com frontend React, API Fastify e sessao em
-          cookie.
-        </p>
 
         <form className="auth-form" onSubmit={onSubmit}>
           {isRegisterMode ? (
@@ -84,11 +87,26 @@ export function AuthPage({ mode }: AuthPageProps) {
             <span>Senha</span>
             <input
               {...register('password')}
-              placeholder="Minimo de 8 caracteres"
+              placeholder="Mínimo de 8 caracteres"
               type="password"
             />
             <small>{errors.password?.message}</small>
           </label>
+
+          {isRegisterMode ? (
+            <>
+              <input type="hidden" {...register('consentVersion')} />
+
+              <label className="checkbox-field">
+                <input type="checkbox" {...register('consentAccepted')} />
+                <span>
+                  Li e aceito a política de privacidade e os termos da versão{' '}
+                  {consentVersion}.
+                </span>
+              </label>
+              <small>{consentError}</small>
+            </>
+          ) : null}
 
           {currentMutation.error ? (
             <div className="feedback feedback-error">
@@ -106,11 +124,17 @@ export function AuthPage({ mode }: AuthPageProps) {
         </form>
 
         <div className="auth-footer">
-          {isRegisterMode ? 'Ja possui uma conta?' : 'Ainda nao tem uma conta?'}{' '}
+          {isRegisterMode ? 'Já possui uma conta?' : 'Ainda não tem uma conta?'}{' '}
           <Link to={isRegisterMode ? '/login' : '/cadastro'}>
             {isRegisterMode ? 'Fazer login' : 'Criar conta'}
           </Link>
         </div>
+
+        {!isRegisterMode ? (
+          <div className="auth-link-row">
+            <Link to="/esqueci-senha">Esqueci minha senha</Link>
+          </div>
+        ) : null}
       </section>
     </main>
   );
