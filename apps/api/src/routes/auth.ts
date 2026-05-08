@@ -21,6 +21,13 @@ const cookieOptions = {
   secure: env.NODE_ENV === 'production',
 };
 
+const sessionCookieOptions = {
+  ...cookieOptions,
+  // Em producao no Render, frontend e API ficam em origins diferentes.
+  // SameSite=None permite que o navegador reenvie a sessao nas chamadas CORS.
+  sameSite: env.NODE_ENV === 'production' ? ('none' as const) : cookieOptions.sameSite,
+};
+
 function getAuthContext(request: {
   id: string;
   ip: string;
@@ -38,7 +45,7 @@ function getAuthContext(request: {
 
 function buildSessionCookieOptions(maxAge: number) {
   return {
-    ...cookieOptions,
+    ...sessionCookieOptions,
     maxAge,
   };
 }
