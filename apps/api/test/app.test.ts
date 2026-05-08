@@ -128,6 +128,19 @@ describe('api bootstrap', () => {
     });
   });
 
+  it('ignora cookie de sessao invalido no logout e limpa o cookie', async () => {
+    const response = await authEnvironment!.app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/logout',
+      headers: {
+        cookie: 'economy_cash_session=valor-invalido',
+      },
+    });
+
+    expect(response.statusCode).toBe(204);
+    expect(response.headers['set-cookie']).toContain('economy_cash_session=;');
+  });
+
   it('serializa erros com code e correlation id', async () => {
     const response = await authEnvironment!.app.inject({
       method: 'POST',
