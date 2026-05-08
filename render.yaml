@@ -11,6 +11,9 @@
 #
 # Se o Render atribuir outro subdominio, ajuste esses dois valores no dashboard
 # apos o primeiro deploy.
+#
+# No plano free, a API aplica o schema base ao iniciar e por isso este Blueprint
+# nao usa preDeployCommand.
 
 previews:
   generation: off
@@ -35,10 +38,6 @@ services:
       npm run build --workspace @shf/contracts &&
       npm run build --workspace @shf/domain-core &&
       npm run build --workspace @shf/api
-    preDeployCommand: >-
-      psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f infra/postgres/init/001-bootstrap-schema.sql &&
-      psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f infra/postgres/init/003-auth-schema.sql &&
-      psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f infra/postgres/init/004-finance-schema.sql
     startCommand: node apps/api/dist/server.js
     healthCheckPath: /health
     autoDeployTrigger: commit

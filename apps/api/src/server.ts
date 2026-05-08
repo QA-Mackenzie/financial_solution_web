@@ -1,16 +1,21 @@
 import { buildApp } from './app';
 import { env } from './config';
+import { ensureDatabaseSchema } from './lib/database-bootstrap';
+import { createDatabaseClient } from './lib/database';
 
 async function start() {
-  const app = buildApp();
+  const database = createDatabaseClient();
+  const app = buildApp({ database });
 
   try {
+    await ensureDatabaseSchema(database);
     await app.listen({
       host: '0.0.0.0',
       port: env.API_PORT,
     });
   } catch (error) {
     app.log.error(error);
+    await app.close();
     process.exit(1);
   }
 }
