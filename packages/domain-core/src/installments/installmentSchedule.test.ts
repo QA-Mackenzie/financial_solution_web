@@ -9,7 +9,7 @@ import {
 import type {
   InstallmentOperation,
   InstallmentPlanListItem,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 
 const basePlan: InstallmentPlanListItem = {
   id: 'plan-1',

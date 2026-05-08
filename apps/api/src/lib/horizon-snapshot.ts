@@ -8,14 +8,14 @@ import type {
   ProvisionsSnapshot,
   TransactionsSnapshot,
   VariableExpenseOverride,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 import {
   buildFinancialHorizon,
   buildProjectedProvisionOccurrences,
   buildProjectedContractOccurrences,
   buildProvisionAdjustedHorizon,
   buildProjectedVariableExpenseOccurrences,
-} from '@shf/domain-core';
+} from '@economy-cash/domain-core';
 
 export const OFFICIAL_HORIZON_TOTAL_MONTHS = 24;
 

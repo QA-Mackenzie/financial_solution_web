@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Definir a linha minima de observabilidade adotada na Sprint 0 para a API da SHF Web.
+Definir a linha minima de observabilidade adotada na Sprint 0 para a API da Economy Cash.
 
 ## Padrões
 

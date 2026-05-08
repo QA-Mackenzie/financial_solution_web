@@ -18,7 +18,7 @@ import type {
   TransactionsSnapshot,
   VariableExpenseOverrideListItem,
   VariableExpenseSnapshot,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 import {
   buildCombinedCreditCardFinancials,
   buildCreditCardInvoices,
@@ -35,7 +35,7 @@ import {
   buildProjectedProvisionOccurrences,
   buildProjectedVariableExpenseOccurrences,
   buildProvisionAdjustedHorizon,
-} from '@shf/domain-core';
+} from '@economy-cash/domain-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from './App';

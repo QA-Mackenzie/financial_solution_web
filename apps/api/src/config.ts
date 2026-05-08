@@ -6,7 +6,7 @@ const envSchema = z.object({
   DATABASE_URL: z
     .string()
     .min(1)
-    .default('postgres://postgres:postgres@localhost:5432/shf_web'),
+    .default('postgres://postgres:postgres@localhost:5432/economy_cash'),
   EMAIL_VERIFICATION_TOKEN_TTL_HOURS: z.coerce
     .number()
     .int()
@@ -21,7 +21,7 @@ const envSchema = z.object({
     .positive()
     .default(30),
   WEB_ORIGIN: z.string().url().default('http://localhost:5173'),
-  SESSION_COOKIE_NAME: z.string().min(3).default('shf_session'),
+  SESSION_COOKIE_NAME: z.string().min(3).default('economy_cash_session'),
   SESSION_SECRET: z
     .string()
     .min(12)

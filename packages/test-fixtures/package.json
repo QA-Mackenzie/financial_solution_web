@@ -1,5 +1,5 @@
 {
-  "name": "@shf/test-fixtures",
+  "name": "@economy-cash/test-fixtures",
   "version": "0.1.0",
   "private": true,
   "main": "./dist/index.js",
@@ -17,6 +17,6 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@shf/contracts": "0.1.0"
+    "@economy-cash/contracts": "0.1.0"
   }
 }

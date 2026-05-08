@@ -11,7 +11,7 @@ export function healthRoutes(database: DatabaseClient): FastifyPluginAsync {
         checks: {
           database: databaseHealth,
         },
-        service: 'shf-web-api',
+        service: 'economy-cash-api',
         status: databaseHealth.status === 'up' ? 'ok' : 'degraded',
         timestamp: new Date().toISOString(),
       };

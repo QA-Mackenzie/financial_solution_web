@@ -2,7 +2,7 @@ import type {
   Account,
   AccountListItem,
   AccountsSnapshot,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 
 const toAccountListItem = (
   account: Account,

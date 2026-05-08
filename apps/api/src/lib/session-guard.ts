@@ -1,4 +1,4 @@
-import type { SessionPayload } from '@shf/contracts';
+import type { SessionPayload } from '@economy-cash/contracts';
 
 import type { AuthService } from './auth-service';
 import { AppError } from './errors';

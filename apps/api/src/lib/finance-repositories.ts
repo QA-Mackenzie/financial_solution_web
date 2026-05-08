@@ -50,7 +50,7 @@ import type {
   TransactionListItem,
   VariableExpenseOverride,
   VariableExpenseOverrideListItem,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 import {
   buildCreditCardInvoices,
   buildCreditCardPurchaseListItems,
@@ -70,7 +70,7 @@ import {
   sanitizeTagIds,
   sanitizeTagInput,
   sanitizeTransactionInput,
-} from '@shf/domain-core';
+} from '@economy-cash/domain-core';
 import type { QueryResultRow } from 'pg';
 
 import type { DatabaseClient, DatabaseExecutor } from './database';

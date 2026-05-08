@@ -4,7 +4,7 @@ import {
   registerInputSchema,
   type LoginInput,
   type RegisterInput,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 import { useForm, type FieldErrors } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -65,7 +65,7 @@ export function AuthPage({ mode }: AuthPageProps) {
   return (
     <main className="auth-page">
       <section className="auth-panel">
-        <div className="eyebrow">SHF Web</div>
+        <div className="eyebrow">Economy Cash</div>
         <h1>{isRegisterMode ? 'Crie sua conta' : 'Entre na plataforma'}</h1>
 
         <form className="auth-form" onSubmit={onSubmit}>

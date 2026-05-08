@@ -213,7 +213,7 @@ insert into legacy_import.sqlite_import_batches (
 values (
   'e61d6d8c-29f4-4ec0-a6b5-b48302080348',
   '92f49d09-7671-4518-bd08-c566ce68636a',
-  'C:/temp/shf-desktop.sqlite',
+  'C:/temp/economy-cash-desktop.sqlite',
   'seed-checksum-v1',
   'staged',
   '{"detectedTables":["accounts","manual_transactions"]}'::jsonb,

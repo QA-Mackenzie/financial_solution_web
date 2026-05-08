@@ -5,6 +5,6 @@ export default defineConfig({
   dts: true,
   entry: ['src/server.ts'],
   format: ['cjs'],
-  noExternal: ['@shf/contracts', '@shf/domain-core'],
+  noExternal: ['@economy-cash/contracts', '@economy-cash/domain-core'],
   platform: 'node',
 });

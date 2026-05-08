@@ -6,7 +6,7 @@ import {
   type FinancialRecordFilter,
   type FinancialRecordListItem,
   type TagListItem,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 
 import {
   formatCategoryLabel,

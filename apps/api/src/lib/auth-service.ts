@@ -7,8 +7,8 @@ import type {
   PasswordResetRequestResult,
   RegisterInput,
   SessionPayload,
-} from '@shf/contracts';
-import { normalizeEmail } from '@shf/domain-core';
+} from '@economy-cash/contracts';
+import { normalizeEmail } from '@economy-cash/domain-core';
 import type { QueryResultRow } from 'pg';
 
 import { env } from '../config';

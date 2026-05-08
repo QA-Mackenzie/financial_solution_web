@@ -1,14 +1,14 @@
-import type { AccountsSnapshot } from '@shf/contracts';
+import type { AccountsSnapshot } from '@economy-cash/contracts';
 import {
   DEFAULT_VARIABLE_EXPENSE_WINDOW_IN_MONTHS,
   MAX_VARIABLE_EXPENSE_WINDOW_IN_MONTHS,
   MIN_VARIABLE_EXPENSE_WINDOW_IN_MONTHS,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 import type {
   ProjectedVariableExpenseOccurrence,
   TransactionsSnapshot,
   VariableExpenseOverride,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 
 export interface BuildProjectedVariableExpenseOccurrencesOptions {
   currentDate?: string;

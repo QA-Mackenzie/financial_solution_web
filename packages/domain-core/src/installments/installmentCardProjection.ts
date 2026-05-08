@@ -8,11 +8,11 @@ import type {
   CreditCardListItem,
   CreditCardPurchaseListItem,
   ProjectedCreditCardInvoiceOccurrence,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 import type {
   InstallmentsSnapshot,
   ProjectedInstallmentCreditCardPurchase,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 
 export interface CombinedCreditCardFinancials {
   cards: CreditCardListItem[];

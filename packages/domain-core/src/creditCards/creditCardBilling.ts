@@ -7,7 +7,7 @@ import type {
   CreditCardPurchaseListItem,
   ProjectedCreditCardInvoiceOccurrence,
   CreditCardStatementCycle,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 
 type CreditCardBillingCard = Pick<
   CreditCardListItem,

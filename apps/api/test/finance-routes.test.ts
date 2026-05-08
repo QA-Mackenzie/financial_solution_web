@@ -3,8 +3,8 @@ import type {
   ManualTransaction,
   SessionPayload,
   TransactionsSnapshot,
-} from '@shf/contracts';
-import { makeRegisterInputFixture } from '@shf/test-fixtures';
+} from '@economy-cash/contracts';
+import { makeRegisterInputFixture } from '@economy-cash/test-fixtures';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {

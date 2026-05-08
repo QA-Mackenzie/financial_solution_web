@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Estabelecer a convencao minima de configuracao por ambiente da SHF Web desde a Sprint 0.
+Estabelecer a convencao minima de configuracao por ambiente da Economy Cash desde a Sprint 0.
 
 ## Convencoes
 

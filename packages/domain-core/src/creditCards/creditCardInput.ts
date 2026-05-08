@@ -1,7 +1,7 @@
 import type {
   CreateCreditCardInput,
   UpdateCreditCardInput,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 
 type ValidatedCreditCardInput = CreateCreditCardInput | UpdateCreditCardInput;
 

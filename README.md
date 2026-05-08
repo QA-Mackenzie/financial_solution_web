@@ -1,6 +1,6 @@
-# SHF Web
+# Economy Cash
 
-Nova base da versao web da SHF, desenvolvida em arquitetura greenfield e isolada da aplicacao desktop existente.
+Nova base da versao web da Economy Cash, desenvolvida em arquitetura greenfield e isolada da aplicacao desktop existente.
 
 ## Estrutura
 

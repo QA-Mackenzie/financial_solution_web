@@ -24,7 +24,7 @@ import type {
   UpdateTagInput,
   UpdateTransactionInput,
   VariableExpenseOverride,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 
 import { financeApi } from '../../lib/api';
 

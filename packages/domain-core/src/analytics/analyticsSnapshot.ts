@@ -7,8 +7,8 @@ import type {
   FinancialRecordFilter,
   FinancialRecordListItem,
   FinancialRecordQuerySnapshot,
-} from '@shf/contracts';
-import { DEFAULT_UNCATEGORIZED_CATEGORY, normalizeCategoryLabel } from '@shf/contracts';
+} from '@economy-cash/contracts';
+import { DEFAULT_UNCATEGORIZED_CATEGORY, normalizeCategoryLabel } from '@economy-cash/contracts';
 
 const sanitizeFilters = (
   filters: FinancialRecordFilter = {},

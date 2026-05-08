@@ -3,7 +3,7 @@ import {
   type AccountType,
   type CreateAccountInput,
   type UpdateAccountInput,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 
 type ValidatedAccountInput = CreateAccountInput | UpdateAccountInput;
 

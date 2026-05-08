@@ -1,16 +1,16 @@
-﻿import type { AccountsSnapshot } from '@shf/contracts';
-import type { ProjectedContractOccurrence } from '@shf/contracts';
-import type { ProjectedCreditCardInvoiceOccurrence } from '@shf/contracts';
-import type { ProjectedInstallmentOccurrence } from '@shf/contracts';
+import type { AccountsSnapshot } from '@economy-cash/contracts';
+import type { ProjectedContractOccurrence } from '@economy-cash/contracts';
+import type { ProjectedCreditCardInvoiceOccurrence } from '@economy-cash/contracts';
+import type { ProjectedInstallmentOccurrence } from '@economy-cash/contracts';
 import {
   DEFAULT_HORIZON_SAFETY_MARGIN_IN_CENTS,
   type HorizonRiskLevel,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 import type {
   ProjectedVariableExpenseOccurrence,
   TransactionListItem,
   TransactionsSnapshot,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 
 export interface FinancialHorizonMonth {
   id: string;

@@ -3,8 +3,8 @@ import {
   type CreateTransactionInput,
   type TransactionType,
   type UpdateTransactionInput,
-} from '@shf/contracts';
-import { sanitizeCategoryLabel } from '@shf/contracts';
+} from '@economy-cash/contracts';
+import { sanitizeCategoryLabel } from '@economy-cash/contracts';
 import { sanitizeTagIds, validateTagIds } from '../tags/tagInput';
 
 type ValidatedTransactionInput =

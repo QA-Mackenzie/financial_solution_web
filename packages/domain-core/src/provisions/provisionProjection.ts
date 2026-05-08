@@ -8,7 +8,7 @@ import type {
   ProjectedProvisionOccurrence,
   ProvisionListItem,
   ProvisionsSnapshot,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 
 export interface BuildProjectedProvisionOccurrencesOptions {
   currentDate?: string;

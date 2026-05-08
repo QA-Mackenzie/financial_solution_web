@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import type { AccountsSnapshot } from '@shf/contracts';
-import type { TransactionsSnapshot } from '@shf/contracts';
+import type { AccountsSnapshot } from '@economy-cash/contracts';
+import type { TransactionsSnapshot } from '@economy-cash/contracts';
 import { buildProjectedVariableExpenseOccurrences } from './variableExpenseProjection';
 
 const accountsSnapshot: AccountsSnapshot = {

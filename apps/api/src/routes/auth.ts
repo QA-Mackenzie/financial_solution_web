@@ -7,7 +7,7 @@ import {
   passwordResetRequestResultSchema,
   registerInputSchema,
   sessionSchema,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 
 import { env } from '../config';
 import type { AuthService } from '../lib/auth-service';

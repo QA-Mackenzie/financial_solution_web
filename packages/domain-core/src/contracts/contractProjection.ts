@@ -2,7 +2,7 @@ import type {
   ContractAdjustment,
   ContractsSnapshot,
   ProjectedContractOccurrence,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 
 export interface BuildProjectedContractOccurrencesOptions {
   currentDate?: string;
