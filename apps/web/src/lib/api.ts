@@ -62,6 +62,9 @@ type ApiErrorPayload = {
   message?: string;
 };
 
+const sessionPersistenceErrorMessage =
+  'Conta criada, mas o navegador nao conseguiu manter sua sessao. Permita cookies entre o app e a API e tente entrar novamente.';
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`, {
     credentials: 'include',
@@ -91,6 +94,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
+async function ensureSessionPersistence() {
+  const payload = await request<{ session: SessionPayload | null }>('/api/v1/session');
+
+  if (!payload.session) {
+    throw new Error(sessionPersistenceErrorMessage);
+  }
+
+  return payload.session;
+}
+
 function buildQueryString(filters: FinancialRecordFilter) {
   const params = new URLSearchParams();
 
@@ -111,20 +124,20 @@ export const authApi = {
     return payload.session;
   },
   async login(input: LoginInput): Promise<SessionPayload> {
-    const payload = await request<{ session: SessionPayload }>('/api/v1/auth/login', {
+    await request<{ session: SessionPayload }>('/api/v1/auth/login', {
       method: 'POST',
       body: JSON.stringify(input),
     });
 
-    return payload.session;
+    return ensureSessionPersistence();
   },
   async register(input: RegisterInput): Promise<SessionPayload> {
-    const payload = await request<{ session: SessionPayload }>('/api/v1/auth/register', {
+    await request<{ session: SessionPayload }>('/api/v1/auth/register', {
       method: 'POST',
       body: JSON.stringify(input),
     });
 
-    return payload.session;
+    return ensureSessionPersistence();
   },
   logout(): Promise<void> {
     return request('/api/v1/auth/logout', {
