@@ -58,6 +58,9 @@ type PasswordResetTokenRecord = QueryResultRow & {
   user_id: string;
 };
 
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export class AuthService {
   private readonly consentVersion: string;
 
@@ -236,11 +239,13 @@ export class AuthService {
     sessionToken: string | undefined,
     renew: boolean,
   ): Promise<{ session: SessionPayload; sessionToken: string } | null> {
-    if (!sessionToken?.trim()) {
+    const normalizedSessionToken = normalizeSessionToken(sessionToken);
+
+    if (!normalizedSessionToken) {
       return null;
     }
 
-    const session = await this.findSession(sessionToken);
+    const session = await this.findSession(normalizedSessionToken);
 
     if (!session) {
       return null;
@@ -254,7 +259,7 @@ export class AuthService {
         `update auth.sessions
          set revoked_at = $2
          where id = $1 and revoked_at is null`,
-        [sessionToken, now.toISOString()],
+        [normalizedSessionToken, now.toISOString()],
       );
 
       return null;
@@ -263,7 +268,7 @@ export class AuthService {
     if (!renew) {
       return {
         session: this.toSessionPayload(session),
-        sessionToken,
+        sessionToken: normalizedSessionToken,
       };
     }
 
@@ -274,7 +279,7 @@ export class AuthService {
        set expires_at = $2,
            last_seen_at = $3
        where id = $1`,
-      [sessionToken, renewedExpiresAt.toISOString(), now.toISOString()],
+      [normalizedSessionToken, renewedExpiresAt.toISOString(), now.toISOString()],
     );
 
     return {
@@ -282,7 +287,7 @@ export class AuthService {
         ...this.toSessionPayload(session),
         expiresAt: renewedExpiresAt.toISOString(),
       },
-      sessionToken,
+      sessionToken: normalizedSessionToken,
     };
   }
 
@@ -290,7 +295,9 @@ export class AuthService {
     sessionToken: string | undefined,
     context: AuthRequestContext,
   ): Promise<void> {
-    if (!sessionToken?.trim()) {
+    const normalizedSessionToken = normalizeSessionToken(sessionToken);
+
+    if (!normalizedSessionToken) {
       return;
     }
 
@@ -300,7 +307,7 @@ export class AuthService {
        set revoked_at = $2
        where id = $1 and revoked_at is null
        returning user_id`,
-      [sessionToken, now.toISOString()],
+      [normalizedSessionToken, now.toISOString()],
     );
 
     if ((result.rowCount ?? 0) > 0) {
@@ -585,4 +592,14 @@ function toIsoString(value: Date | string | null): string | null {
 
 function toRequiredIsoString(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : value;
+}
+
+function normalizeSessionToken(sessionToken: string | undefined): string | null {
+  const normalizedSessionToken = sessionToken?.trim();
+
+  if (!normalizedSessionToken || !uuidPattern.test(normalizedSessionToken)) {
+    return null;
+  }
+
+  return normalizedSessionToken;
 }
