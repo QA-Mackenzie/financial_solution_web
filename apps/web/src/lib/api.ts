@@ -84,7 +84,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(
       errorPayload.error?.message ??
         errorPayload.message ??
-        'Nao foi possivel concluir a operacao.',
+        'Não foi possível concluir a operação.',
     );
   }
 

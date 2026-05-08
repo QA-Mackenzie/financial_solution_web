@@ -49,3 +49,7 @@ npm run check
 - a API responde com o header x-correlation-id em todas as requisicoes
 - erros da API sao serializados em um formato estavel com code, message e requestId
 - logs da API ocultam campos sensiveis como senha, cookie e authorization
+
+## Guias operacionais
+
+- publicacao no Render: [docs/operations/render-deploy-guide.md](docs/operations/render-deploy-guide.md)

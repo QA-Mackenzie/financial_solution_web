@@ -14,6 +14,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 
+import { CurrencyInput } from '../../components/CurrencyInput';
 import { formatCurrencyInCents, formatDate } from '../../lib/finance-format';
 import {
   useAccountsSnapshotQuery,
@@ -51,7 +52,7 @@ function describePlanSource(plan: InstallmentPlanListItem) {
     return `Debita direto em ${plan.accountName ?? 'conta removida'}`;
   }
 
-  return `Projeta compras em ${plan.creditCardName ?? 'cartao removido'} • paga por ${plan.paymentAccountName ?? 'conta removida'}`;
+  return `Projeta compras em ${plan.creditCardName ?? 'cartão removido'} • paga por ${plan.paymentAccountName ?? 'conta removida'}`;
 }
 
 function getOccurrenceBadge(occurrence: InstallmentOccurrenceListItem) {
@@ -70,6 +71,7 @@ export function InstallmentsPage() {
   const updateInstallmentPlanMutation = useUpdateInstallmentPlanMutation();
   const anticipateInstallmentPlanMutation = useAnticipateInstallmentPlanMutation();
   const {
+    control: planControl,
     handleSubmit: handlePlanSubmit,
     register: registerPlan,
     reset: resetPlan,
@@ -222,13 +224,8 @@ export function InstallmentsPage() {
   return (
     <section className="page-stack">
       <article className="dashboard-card hero-card">
-        <div className="eyebrow">Sprint 7</div>
-        <h2>Parcelamentos, cronograma e antecipacoes</h2>
-        <p>
-          Cadastre parcelamentos em conta ou no cartao, acompanhe cada parcela
-          no cronograma oficial e antecipe parte ou todo o saldo restante sem
-          perder rastreabilidade.
-        </p>
+        <div className="eyebrow">Parcelamentos</div>
+        <h2>Parcelamentos, cronograma e antecipações</h2>
       </article>
 
       <div className="panel-grid panel-grid-2">
@@ -240,13 +237,13 @@ export function InstallmentsPage() {
             </div>
             {editingPlan ? (
               <button className="ghost-button" onClick={cancelEditing} type="button">
-                Cancelar edicao
+                Cancelar edição
               </button>
             ) : null}
           </div>
 
           {availableAccounts.length === 0 && availableCards.length === 0 ? (
-            <p>Cadastre uma conta ou um cartao antes de registrar parcelamentos.</p>
+            <p>Cadastre uma conta ou um cartão antes de registrar parcelamentos.</p>
           ) : (
             <form className="finance-form" onSubmit={onSubmitPlan}>
               <label>
@@ -268,14 +265,14 @@ export function InstallmentsPage() {
                   })}
                 >
                   <option value="account">Conta</option>
-                  <option value="creditCard">Cartao de credito</option>
+                  <option value="creditCard">Cartão de crédito</option>
                 </select>
                 <small>{planErrors.sourceType?.message}</small>
               </label>
 
               {selectedSourceType === 'account' ? (
                 <label>
-                  <span>Conta de lancamento</span>
+                  <span>Conta de lançamento</span>
                   <select {...registerPlan('accountId')}>
                     {availableAccounts.map((account) => (
                       <option key={account.id} value={account.id}>
@@ -287,7 +284,7 @@ export function InstallmentsPage() {
                 </label>
               ) : (
                 <label>
-                  <span>Cartao vinculado</span>
+                  <span>Cartão vinculado</span>
                   <select {...registerPlan('creditCardId')}>
                     {availableCards.map((card) => (
                       <option key={card.id} value={card.id}>
@@ -300,7 +297,7 @@ export function InstallmentsPage() {
               )}
 
               <label>
-                <span>Descricao do parcelamento</span>
+                <span>Descrição do parcelamento</span>
                 <input
                   {...registerPlan('description')}
                   placeholder="Ex.: notebook parcelado"
@@ -310,12 +307,8 @@ export function InstallmentsPage() {
 
               <div className="settings-grid">
                 <label>
-                  <span>Valor total em centavos</span>
-                  <input
-                    {...registerPlan('totalAmountInCents', { valueAsNumber: true })}
-                    placeholder="0"
-                    type="number"
-                  />
+                  <span>Valor total em reais</span>
+                  <CurrencyInput control={planControl} name="totalAmountInCents" />
                   <small>{planErrors.totalAmountInCents?.message}</small>
                 </label>
 
@@ -332,7 +325,7 @@ export function InstallmentsPage() {
               </div>
 
               <label>
-                <span>Primeira ocorrencia</span>
+                <span>Primeira ocorrência</span>
                 <input {...registerPlan('firstOccurrenceDate')} type="date" />
                 <small>{planErrors.firstOccurrenceDate?.message}</small>
               </label>
@@ -360,7 +353,7 @@ export function InstallmentsPage() {
         </article>
 
         <article className="dashboard-card form-card">
-          <div className="eyebrow">Antecipacao</div>
+          <div className="eyebrow">Antecipação</div>
           <h3>Antecipar parcelas futuras</h3>
 
           {plans.length === 0 ? (
@@ -386,7 +379,7 @@ export function InstallmentsPage() {
               </label>
 
               <label>
-                <span>Data da antecipacao</span>
+                <span>Data da antecipação</span>
                 <input {...registerAnticipation('operationDate')} type="date" />
                 <small>{anticipationErrors.operationDate?.message}</small>
               </label>
@@ -428,7 +421,7 @@ export function InstallmentsPage() {
               <strong>{plans.length}</strong>
             </div>
             <div className="stat-item">
-              <span>Operacoes de antecipacao</span>
+              <span>Operações de antecipação</span>
               <strong>{operations.length}</strong>
             </div>
             <div className="stat-item">
@@ -436,7 +429,7 @@ export function InstallmentsPage() {
               <strong>{projectedAccountOccurrences.length}</strong>
             </div>
             <div className="stat-item">
-              <span>Compras projetadas no cartao</span>
+              <span>Compras projetadas no cartão</span>
               <strong>{projectedCreditCardPurchases.length}</strong>
             </div>
           </div>
@@ -530,7 +523,7 @@ export function InstallmentsPage() {
 
               {selectedPlanProjectedCardPurchases.length > 0 ? (
                 <>
-                  <div className="eyebrow">Impacto no cartao</div>
+                  <div className="eyebrow">Impacto no cartão</div>
                   <div className="sub-entity-list">
                     {selectedPlanProjectedCardPurchases.map((purchase) => (
                       <div className="sub-entity-item" key={purchase.id}>
@@ -557,13 +550,13 @@ export function InstallmentsPage() {
         <article className="dashboard-card">
           <div className="section-heading-row">
             <div>
-              <div className="eyebrow">Historico</div>
-              <h3>Antecipacoes registradas</h3>
+              <div className="eyebrow">Histórico</div>
+              <h3>Antecipações registradas</h3>
             </div>
           </div>
 
           {selectedPlanOperations.length === 0 ? (
-            <p>Nenhuma antecipacao aplicada ao parcelamento selecionado.</p>
+            <p>Nenhuma antecipação aplicada ao parcelamento selecionado.</p>
           ) : (
             <div className="sub-entity-list">
               {selectedPlanOperations.map((operation) => (

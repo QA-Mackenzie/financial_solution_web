@@ -31,26 +31,26 @@ export const provisionsSnapshotSchema = z.object({
 });
 
 const createProvisionInputBaseSchema = z.object({
-  accountId: z.string().uuid('Selecione uma conta valida para a provisao.'),
+  accountId: z.string().uuid('Selecione uma conta válida para a provisão.'),
   description: z
     .string()
-    .min(1, 'Informe uma descricao para a provisao.')
-    .max(120, 'A descricao da provisao deve ter no maximo 120 caracteres.'),
+    .min(1, 'Informe uma descrição para a provisão.')
+    .max(120, 'A descrição da provisão deve ter no máximo 120 caracteres.'),
   category: z
     .string()
-    .min(1, 'Informe uma categoria para a provisao.')
-    .max(80, 'A categoria da provisao deve ter no maximo 80 caracteres.'),
+    .min(1, 'Informe uma categoria para a provisão.')
+    .max(80, 'A categoria da provisão deve ter no máximo 80 caracteres.'),
   targetAmountInCents: z
     .number()
-    .int('O valor-alvo da provisao deve ser informado em centavos inteiros.')
-    .positive('O valor-alvo da provisao deve ser maior que zero.'),
+    .int('O valor-alvo da provisão deve ser informado corretamente.')
+    .positive('O valor-alvo da provisão deve ser maior que zero.'),
   startDate: z.string().regex(
     /^\d{4}-\d{2}-\d{2}$/,
-    'Informe uma data inicial valida no formato AAAA-MM-DD.',
+    'Informe uma data inicial válida no formato AAAA-MM-DD.',
   ),
   targetDate: z.string().regex(
     /^\d{4}-\d{2}-\d{2}$/,
-    'Informe uma data de resgate valida no formato AAAA-MM-DD.',
+    'Informe uma data de resgate válida no formato AAAA-MM-DD.',
   ),
 });
 
@@ -60,7 +60,7 @@ export const createProvisionInputSchema = createProvisionInputBaseSchema.superRe
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message:
-          'A data de resgate deve ser igual ou posterior ao inicio da provisao.',
+          'A data de resgate deve ser igual ou posterior ao início da provisão.',
         path: ['targetDate'],
       });
     }
@@ -76,17 +76,17 @@ export const updateProvisionInputSchema = createProvisionInputBaseSchema
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message:
-          'A data de resgate deve ser igual ou posterior ao inicio da provisao.',
+          'A data de resgate deve ser igual ou posterior ao início da provisão.',
         path: ['targetDate'],
       });
     }
   });
 
 export const redeemProvisionInputSchema = z.object({
-  provisionId: z.string().uuid('Selecione uma provisao valida.'),
+  provisionId: z.string().uuid('Selecione uma provisão válida.'),
   redeemedAt: z.string().regex(
     /^\d{4}-\d{2}-\d{2}$/,
-    'Informe uma data de resgate valida no formato AAAA-MM-DD.',
+    'Informe uma data de resgate válida no formato AAAA-MM-DD.',
   ),
 });
 

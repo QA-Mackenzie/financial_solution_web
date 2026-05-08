@@ -14,25 +14,25 @@ export const sessionSchema = z.object({
 });
 
 export const loginInputSchema = z.object({
-  email: z.string().email('Informe um email valido.'),
+  email: z.string().email('Informe um email válido.'),
   password: z.string().min(8, 'A senha deve ter pelo menos 8 caracteres.'),
 });
 
 export const registerInputSchema = loginInputSchema.extend({
   consentAccepted: z.boolean().refine((value) => value, {
-    message: 'Voce precisa aceitar a politica para continuar.',
+    message: 'Você precisa aceitar a política para continuar.',
   }),
   consentVersion: z.string().min(1),
   name: z.string().min(2, 'Informe seu nome completo.'),
 });
 
 export const passwordResetRequestInputSchema = z.object({
-  email: z.string().email('Informe um email valido.'),
+  email: z.string().email('Informe um email válido.'),
 });
 
 export const passwordResetInputSchema = z.object({
   password: z.string().min(8, 'A senha deve ter pelo menos 8 caracteres.'),
-  token: z.string().min(20, 'Informe um token de reset valido.'),
+  token: z.string().min(20, 'Informe um token de reset válido.'),
 });
 
 export const passwordResetRequestResultSchema = z.object({

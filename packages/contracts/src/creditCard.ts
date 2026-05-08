@@ -102,12 +102,12 @@ export const creditCardsSnapshotSchema = z.object({
 const createCreditCardInputBaseSchema = z.object({
   name: z
     .string()
-    .min(1, 'Informe um nome para o cartao.')
-    .max(80, 'O nome do cartao deve ter no maximo 80 caracteres.'),
+    .min(1, 'Informe um nome para o cartão.')
+    .max(80, 'O nome do cartão deve ter no máximo 80 caracteres.'),
   creditLimitInCents: z
     .number()
-    .int('O limite do cartao deve ser informado em centavos inteiros.')
-    .positive('O limite do cartao deve ser maior que zero.'),
+    .int('O limite do cartão deve ser informado corretamente.')
+    .positive('O limite do cartão deve ser maior que zero.'),
   statementClosingDay: z
     .number()
     .int('O dia de fechamento deve estar entre 1 e 31.')
@@ -118,14 +118,14 @@ const createCreditCardInputBaseSchema = z.object({
     .int('O dia de vencimento deve estar entre 1 e 31.')
     .min(1, 'O dia de vencimento deve estar entre 1 e 31.')
     .max(31, 'O dia de vencimento deve estar entre 1 e 31.'),
-  paymentAccountId: z.string().uuid('Selecione a conta pagadora padrao do cartao.'),
+  paymentAccountId: z.string().uuid('Selecione a conta pagadora padrão do cartão.'),
 });
 
 export const createCreditCardInputSchema = createCreditCardInputBaseSchema.superRefine((value, context) => {
   if (value.statementClosingDay === value.dueDay) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'O vencimento do cartao deve ser diferente do dia de fechamento.',
+      message: 'O vencimento do cartão deve ser diferente do dia de fechamento.',
       path: ['dueDay'],
     });
   }
@@ -139,25 +139,25 @@ export const updateCreditCardInputSchema = createCreditCardInputBaseSchema
     if (value.statementClosingDay === value.dueDay) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'O vencimento do cartao deve ser diferente do dia de fechamento.',
+        message: 'O vencimento do cartão deve ser diferente do dia de fechamento.',
         path: ['dueDay'],
       });
     }
   });
 
 export const createCreditCardPurchaseInputSchema = z.object({
-  creditCardId: z.string().uuid('Selecione um cartao para registrar a compra.'),
+  creditCardId: z.string().uuid('Selecione um cartão para registrar a compra.'),
   description: z
     .string()
-    .min(1, 'Informe uma descricao para a compra no cartao.')
-    .max(120, 'A descricao da compra deve ter no maximo 120 caracteres.'),
+    .min(1, 'Informe uma descrição para a compra no cartão.')
+    .max(120, 'A descrição da compra deve ter no máximo 120 caracteres.'),
   category: z
     .string()
-    .max(80, 'A categoria da compra deve ter no maximo 80 caracteres.')
+    .max(80, 'A categoria da compra deve ter no máximo 80 caracteres.')
     .optional(),
   tagIds: z
     .array(z.string().uuid())
-    .max(8, 'Selecione no maximo 8 tags para o mesmo item financeiro.')
+    .max(8, 'Selecione no máximo 8 tags para o mesmo item financeiro.')
     .optional(),
   amountInCents: z
     .number()
@@ -165,7 +165,7 @@ export const createCreditCardPurchaseInputSchema = z.object({
     .positive('O valor da compra deve ser maior que zero.'),
   purchaseDate: z.string().regex(
     /^\d{4}-\d{2}-\d{2}$/,
-    'Informe uma data valida no formato AAAA-MM-DD.',
+    'Informe uma data válida no formato AAAA-MM-DD.',
   ),
 });
 

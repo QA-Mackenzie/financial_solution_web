@@ -31,11 +31,8 @@ export function PasswordRecoveryPage() {
   return (
     <main className="auth-page">
       <section className="auth-panel">
-        <div className="eyebrow">Recuperacao</div>
+        <div className="eyebrow">Recuperação</div>
         <h1>Recupere seu acesso</h1>
-        <p>
-          Informe o email da sua conta para gerar um link seguro de redefinicao.
-        </p>
 
         <form className="auth-form" onSubmit={onSubmit}>
           <label>
@@ -52,7 +49,7 @@ export function PasswordRecoveryPage() {
 
           {recoveryMutation.isSuccess ? (
             <div className="feedback">
-              Se o email existir, um link de redefinicao foi disponibilizado.
+              Se o email existir, um link de redefinição foi disponibilizado.
             </div>
           ) : null}
 
@@ -60,7 +57,7 @@ export function PasswordRecoveryPage() {
             <div className="feedback">
               Ambiente local: use este{' '}
               <Link to={`/redefinir-senha?token=${previewToken}`}>
-                link de redefinicao
+                link de redefinição
               </Link>
               .
             </div>

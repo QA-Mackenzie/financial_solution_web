@@ -65,12 +65,8 @@ export function AuthPage({ mode }: AuthPageProps) {
   return (
     <main className="auth-page">
       <section className="auth-panel">
-        <div className="eyebrow">Sprint 1</div>
+        <div className="eyebrow">SHF Web</div>
         <h1>{isRegisterMode ? 'Crie sua conta' : 'Entre na plataforma'}</h1>
-        <p>
-          Acesse a shell autenticada da SHF Web com sessao segura, auditoria e
-          recuperacao de senha.
-        </p>
 
         <form className="auth-form" onSubmit={onSubmit}>
           {isRegisterMode ? (
@@ -91,7 +87,7 @@ export function AuthPage({ mode }: AuthPageProps) {
             <span>Senha</span>
             <input
               {...register('password')}
-              placeholder="Minimo de 8 caracteres"
+              placeholder="Mínimo de 8 caracteres"
               type="password"
             />
             <small>{errors.password?.message}</small>
@@ -104,7 +100,7 @@ export function AuthPage({ mode }: AuthPageProps) {
               <label className="checkbox-field">
                 <input type="checkbox" {...register('consentAccepted')} />
                 <span>
-                  Li e aceito a politica de privacidade e os termos da versao{' '}
+                  Li e aceito a política de privacidade e os termos da versão{' '}
                   {consentVersion}.
                 </span>
               </label>
@@ -128,7 +124,7 @@ export function AuthPage({ mode }: AuthPageProps) {
         </form>
 
         <div className="auth-footer">
-          {isRegisterMode ? 'Ja possui uma conta?' : 'Ainda nao tem uma conta?'}{' '}
+          {isRegisterMode ? 'Já possui uma conta?' : 'Ainda não tem uma conta?'}{' '}
           <Link to={isRegisterMode ? '/login' : '/cadastro'}>
             {isRegisterMode ? 'Fazer login' : 'Criar conta'}
           </Link>

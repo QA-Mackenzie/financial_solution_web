@@ -13,7 +13,12 @@ import {
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 
-import { formatCurrencyInCents, formatDate } from '../../lib/finance-format';
+import { CurrencyInput } from '../../components/CurrencyInput';
+import {
+  formatCategoryLabel,
+  formatCurrencyInCents,
+  formatDate,
+} from '../../lib/finance-format';
 import {
   useAccountsSnapshotQuery,
   useContractsSnapshotQuery,
@@ -62,6 +67,7 @@ export function ContractsPage() {
   const createAdjustmentMutation = useCreateContractAdjustmentMutation();
   const endContractMutation = useEndContractMutation();
   const {
+    control: contractControl,
     handleSubmit: handleContractSubmit,
     register: registerContract,
     reset: resetContract,
@@ -72,6 +78,7 @@ export function ContractsPage() {
     defaultValues: contractDefaultValues,
   });
   const {
+    control: adjustmentControl,
     handleSubmit: handleAdjustmentSubmit,
     register: registerAdjustment,
     reset: resetAdjustment,
@@ -192,13 +199,8 @@ export function ContractsPage() {
   return (
     <section className="page-stack">
       <article className="dashboard-card hero-card">
-        <div className="eyebrow">Sprint 5</div>
+        <div className="eyebrow">Recorrências</div>
         <h2>Contratos recorrentes</h2>
-        <p>
-          Cadastre receitas e despesas fixas, programe reajustes futuros e
-          encerre recorrencias sem perder historico. O horizonte oficial passa a
-          considerar esses compromissos automaticamente.
-        </p>
       </article>
 
       <div className="panel-grid panel-grid-2">
@@ -210,7 +212,7 @@ export function ContractsPage() {
             </div>
             {editingContract ? (
               <button className="ghost-button" onClick={cancelEditing} type="button">
-                Cancelar edicao
+                Cancelar edição
               </button>
             ) : null}
           </div>
@@ -265,12 +267,8 @@ export function ContractsPage() {
 
               <div className="settings-grid">
                 <label>
-                  <span>Valor em centavos</span>
-                  <input
-                    {...registerContract('amountInCents', { valueAsNumber: true })}
-                    placeholder="0"
-                    type="number"
-                  />
+                  <span>Valor em reais</span>
+                  <CurrencyInput control={contractControl} name="amountInCents" />
                   <small>{contractErrors.amountInCents?.message}</small>
                 </label>
 
@@ -287,7 +285,7 @@ export function ContractsPage() {
               </div>
 
               <label>
-                <span>Inicio da recorrencia</span>
+                <span>Início da recorrência</span>
                 <input {...registerContract('startDate')} type="date" />
                 <small>{contractErrors.startDate?.message}</small>
               </label>
@@ -368,17 +366,13 @@ export function ContractsPage() {
               </label>
 
               <label>
-                <span>Novo valor em centavos</span>
-                <input
-                  {...registerAdjustment('amountInCents', { valueAsNumber: true })}
-                  placeholder="0"
-                  type="number"
-                />
+                <span>Novo valor em reais</span>
+                <CurrencyInput control={adjustmentControl} name="amountInCents" />
                 <small>{adjustmentErrors.amountInCents?.message}</small>
               </label>
 
               <label>
-                <span>Inicio do reajuste</span>
+                <span>Início do reajuste</span>
                 <input {...registerAdjustment('effectiveStartDate')} type="date" />
                 <small>{adjustmentErrors.effectiveStartDate?.message}</small>
               </label>
@@ -392,10 +386,10 @@ export function ContractsPage() {
 
         <article className="dashboard-card form-card">
           <div className="eyebrow">Encerramento</div>
-          <h3>Finalizar recorrencia</h3>
+          <h3>Finalizar recorrência</h3>
 
           {activeContracts.length === 0 ? (
-            <p>Nenhum contrato ativo disponivel para encerramento.</p>
+            <p>Nenhum contrato ativo disponível para encerramento.</p>
           ) : (
             <form className="finance-form" onSubmit={onSubmitEnd}>
               <label>
@@ -429,7 +423,7 @@ export function ContractsPage() {
           <div className="section-heading-row">
             <div>
               <div className="eyebrow">Ativos</div>
-              <h3>Recorrencias em execucao</h3>
+              <h3>Recorrências em execução</h3>
             </div>
           </div>
 
@@ -444,10 +438,10 @@ export function ContractsPage() {
                   <div>
                     <strong>{contract.name}</strong>
                     <span>
-                      {contract.accountName} • {contract.category} • dia {contract.dueDay}
+                      {contract.accountName} • {formatCategoryLabel(contract.category)} • dia {contract.dueDay}
                     </span>
                     <small>
-                      Inicio {formatDate(contract.startDate)}
+                      Início {formatDate(contract.startDate)}
                       {contract.endDate ? ` • fim ${formatDate(contract.endDate)}` : ''}
                     </small>
                   </div>
@@ -513,11 +507,11 @@ export function ContractsPage() {
         </article>
 
         <article className="dashboard-card">
-          <div className="eyebrow">Historico</div>
+          <div className="eyebrow">Histórico</div>
           <h3>Contratos inativos</h3>
 
           {inactiveContracts.length === 0 ? (
-            <p>Nenhum contrato inativo ate o momento.</p>
+            <p>Nenhum contrato inativo até o momento.</p>
           ) : (
             <div className="stack-list">
               {inactiveContracts.map((contract) => (
@@ -525,16 +519,16 @@ export function ContractsPage() {
                   <div>
                     <strong>{contract.name}</strong>
                     <span>
-                      {contract.accountName} • {contract.category} • {contract.status}
+                      {contract.accountName} • {formatCategoryLabel(contract.category)} • {contract.status}
                     </span>
                     <small>
-                      Inicio {formatDate(contract.startDate)}
+                      Início {formatDate(contract.startDate)}
                       {contract.endDate ? ` • fim ${formatDate(contract.endDate)}` : ''}
                     </small>
                   </div>
 
                   <div className="entity-metrics">
-                    <span>Ultimo valor conhecido</span>
+                    <span>Último valor conhecido</span>
                     <strong
                       className={
                         getSignedContractAmountInCents(contract) >= 0

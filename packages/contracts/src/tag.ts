@@ -19,7 +19,7 @@ export const createTagInputSchema = z.object({
   name: z
     .string()
     .min(1, 'Informe um nome para a tag.')
-    .max(40, 'O nome da tag deve ter no maximo 40 caracteres.'),
+    .max(40, 'O nome da tag deve ter no máximo 40 caracteres.'),
 });
 
 export const updateTagInputSchema = createTagInputSchema.extend({

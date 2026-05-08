@@ -14,7 +14,9 @@ import {
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 
+import { CurrencyInput } from '../../components/CurrencyInput';
 import {
+  formatCategoryLabel,
   formatCurrencyInCents,
   formatDate,
   formatMonthYear,
@@ -76,6 +78,7 @@ export function CreditCardsPage() {
   const createCreditCardPurchaseMutation = useCreateCreditCardPurchaseMutation();
   const updateCreditCardPurchaseMutation = useUpdateCreditCardPurchaseMutation();
   const {
+    control: cardControl,
     handleSubmit: handleCardSubmit,
     register: registerCard,
     reset: resetCard,
@@ -86,6 +89,7 @@ export function CreditCardsPage() {
     defaultValues: creditCardDefaultValues,
   });
   const {
+    control: purchaseControl,
     handleSubmit: handlePurchaseSubmit,
     register: registerPurchase,
     reset: resetPurchase,
@@ -217,40 +221,36 @@ export function CreditCardsPage() {
   return (
     <section className="page-stack">
       <article className="dashboard-card hero-card">
-        <div className="eyebrow">Sprint 6</div>
-        <h2>Cartoes de credito e ciclo de fatura</h2>
-        <p>
-          Cadastre cartoes, registre compras proximas ao fechamento e acompanhe
-          em qual vencimento cada fatura vai impactar a conta pagadora.
-        </p>
+        <div className="eyebrow">Crédito</div>
+        <h2>Cartões de crédito e ciclo de fatura</h2>
       </article>
 
       <div className="panel-grid panel-grid-2">
         <article className="dashboard-card form-card">
           <div className="section-heading-row">
             <div>
-              <div className="eyebrow">Cartao</div>
-              <h3>{editingCard ? 'Editar cartao' : 'Novo cartao'}</h3>
+              <div className="eyebrow">Cartão</div>
+              <h3>{editingCard ? 'Editar cartão' : 'Novo cartão'}</h3>
             </div>
             {editingCard ? (
               <button className="ghost-button" onClick={cancelEditingCard} type="button">
-                Cancelar edicao
+                Cancelar edição
               </button>
             ) : null}
           </div>
 
           {availableAccounts.length === 0 ? (
-            <p>Cadastre uma conta ativa antes de definir a conta pagadora do cartao.</p>
+            <p>Cadastre uma conta ativa antes de definir a conta pagadora do cartão.</p>
           ) : (
             <form className="finance-form" onSubmit={onSubmitCard}>
               <label>
-                <span>Nome do cartao</span>
+                <span>Nome do cartão</span>
                 <input {...registerCard('name')} placeholder="Ex.: Visa Platinum" />
                 <small>{cardErrors.name?.message}</small>
               </label>
 
               <label>
-                <span>Conta pagadora padrao</span>
+                <span>Conta pagadora padrão</span>
                 <select {...registerCard('paymentAccountId')}>
                   {availableAccounts.map((account) => (
                     <option key={account.id} value={account.id}>
@@ -263,12 +263,8 @@ export function CreditCardsPage() {
 
               <div className="settings-grid">
                 <label>
-                  <span>Limite em centavos</span>
-                  <input
-                    {...registerCard('creditLimitInCents', { valueAsNumber: true })}
-                    placeholder="0"
-                    type="number"
-                  />
+                  <span>Limite em reais</span>
+                  <CurrencyInput control={cardControl} name="creditLimitInCents" />
                   <small>{cardErrors.creditLimitInCents?.message}</small>
                 </label>
 
@@ -306,8 +302,8 @@ export function CreditCardsPage() {
                 {createCreditCardMutation.isPending || updateCreditCardMutation.isPending
                   ? 'Salvando...'
                   : editingCard
-                    ? 'Atualizar cartao'
-                    : 'Criar cartao'}
+                    ? 'Atualizar cartão'
+                    : 'Criar cartão'}
               </button>
             </form>
           )}
@@ -317,7 +313,7 @@ export function CreditCardsPage() {
           <div className="section-heading-row">
             <div>
               <div className="eyebrow">Compra</div>
-              <h3>{editingPurchase ? 'Editar compra no credito' : 'Nova compra no credito'}</h3>
+              <h3>{editingPurchase ? 'Editar compra no crédito' : 'Nova compra no crédito'}</h3>
             </div>
             {editingPurchase ? (
               <button
@@ -325,17 +321,17 @@ export function CreditCardsPage() {
                 onClick={cancelEditingPurchase}
                 type="button"
               >
-                Cancelar edicao
+                Cancelar edição
               </button>
             ) : null}
           </div>
 
           {cards.length === 0 ? (
-            <p>Cadastre um cartao antes de registrar compras no credito.</p>
+            <p>Cadastre um cartão antes de registrar compras no crédito.</p>
           ) : (
             <form className="finance-form" onSubmit={onSubmitPurchase}>
               <label>
-                <span>Cartao</span>
+                <span>Cartão</span>
                 <select {...registerPurchase('creditCardId')}>
                   {cards.map((card) => (
                     <option key={card.id} value={card.id}>
@@ -347,7 +343,7 @@ export function CreditCardsPage() {
               </label>
 
               <label>
-                <span>Descricao</span>
+                <span>Descrição</span>
                 <input {...registerPurchase('description')} placeholder="Ex.: notebook" />
                 <small>{purchaseErrors.description?.message}</small>
               </label>
@@ -366,12 +362,8 @@ export function CreditCardsPage() {
 
               <div className="settings-grid">
                 <label>
-                  <span>Valor em centavos</span>
-                  <input
-                    {...registerPurchase('amountInCents', { valueAsNumber: true })}
-                    placeholder="0"
-                    type="number"
-                  />
+                  <span>Valor em reais</span>
+                  <CurrencyInput control={purchaseControl} name="amountInCents" />
                   <small>{purchaseErrors.amountInCents?.message}</small>
                 </label>
 
@@ -388,7 +380,7 @@ export function CreditCardsPage() {
                   <div className="tag-checklist-empty">Carregando tags...</div>
                 ) : tags.length === 0 ? (
                   <div className="tag-checklist-empty">
-                    Nenhuma tag cadastrada ainda na area de analytics.
+                    Nenhuma tag cadastrada ainda na área de analytics.
                   </div>
                 ) : (
                   <div className="tag-checklist tag-checklist-grid">
@@ -423,7 +415,7 @@ export function CreditCardsPage() {
 
       <div className="panel-grid panel-grid-2">
         <article className="dashboard-card summary-card">
-          <div className="eyebrow">Resumo de credito</div>
+          <div className="eyebrow">Resumo de crédito</div>
           <strong className="summary-amount">
             {formatCurrencyInCents(
               creditCardsSnapshotQuery.data?.totalInvoiceAmountInCents ?? 0,
@@ -431,7 +423,7 @@ export function CreditCardsPage() {
           </strong>
           <div className="stats-grid">
             <div className="stat-item">
-              <span>Cartoes cadastrados</span>
+              <span>Cartões cadastrados</span>
               <strong>{cards.length}</strong>
             </div>
             <div className="stat-item">
@@ -454,11 +446,11 @@ export function CreditCardsPage() {
         </article>
 
         <article className="dashboard-card">
-          <div className="eyebrow">Debitos projetados</div>
-          <h3>Proximos vencimentos</h3>
+          <div className="eyebrow">Débitos projetados</div>
+          <h3>Próximos vencimentos</h3>
 
           {projectedInvoices.length === 0 ? (
-            <p>Nenhum debito futuro de fatura calculado no momento.</p>
+            <p>Nenhum débito futuro de fatura calculado no momento.</p>
           ) : (
             <div className="sub-entity-list">
               {projectedInvoices.map((invoice) => (
@@ -482,15 +474,15 @@ export function CreditCardsPage() {
       <article className="dashboard-card">
         <div className="section-heading-row">
           <div>
-            <div className="eyebrow">Cartoes</div>
-            <h3>Visao atual de limite, ciclo e fatura</h3>
+            <div className="eyebrow">Cartões</div>
+            <h3>Visão atual de limite, ciclo e fatura</h3>
           </div>
         </div>
 
         {creditCardsSnapshotQuery.isLoading ? (
-          <p>Carregando cartoes...</p>
+          <p>Carregando cartões...</p>
         ) : cards.length === 0 ? (
-          <p>Nenhum cartao cadastrado ate o momento.</p>
+          <p>Nenhum cartão cadastrado até o momento.</p>
         ) : (
           <div className="stack-list">
             {cards.map((card) => (
@@ -508,7 +500,7 @@ export function CreditCardsPage() {
                     onClick={() => startEditingCard(card)}
                     type="button"
                   >
-                    Editar cartao
+                    Editar cartão
                   </button>
                 </div>
 
@@ -537,7 +529,7 @@ export function CreditCardsPage() {
           <div className="section-heading-row">
             <div>
               <div className="eyebrow">Faturas</div>
-              <h3>Consolidacao por vencimento</h3>
+              <h3>Consolidação por vencimento</h3>
             </div>
           </div>
 
@@ -567,7 +559,7 @@ export function CreditCardsPage() {
                       <strong>{invoice.purchaseCount}</strong>
                     </div>
                     <div className="stat-item">
-                      <span>Debito na conta</span>
+                      <span>Débito na conta</span>
                       <strong>{invoice.paymentAccountName}</strong>
                     </div>
                   </div>
@@ -596,13 +588,13 @@ export function CreditCardsPage() {
         <article className="dashboard-card">
           <div className="section-heading-row">
             <div>
-              <div className="eyebrow">Historico</div>
-              <h3>Compras no credito</h3>
+              <div className="eyebrow">Histórico</div>
+              <h3>Compras no crédito</h3>
             </div>
           </div>
 
           {purchases.length === 0 ? (
-            <p>Nenhuma compra no credito registrada ate o momento.</p>
+            <p>Nenhuma compra no crédito registrada até o momento.</p>
           ) : (
             <div className="stack-list">
               {purchases.map((purchase) => (
@@ -645,10 +637,12 @@ export function CreditCardsPage() {
                     <div className="stat-item">
                       <span>Categoria</span>
                       <strong>
-                        {purchase.category ??
-                          (purchase.isProjected
-                            ? 'Parcelamento projetado'
-                            : DEFAULT_UNCATEGORIZED_CATEGORY)}
+                        {formatCategoryLabel(
+                          purchase.category ??
+                            (purchase.isProjected
+                              ? 'Parcelamento projetado'
+                              : DEFAULT_UNCATEGORIZED_CATEGORY),
+                        )}
                       </strong>
                     </div>
                   </div>

@@ -9,6 +9,7 @@ import {
 } from '@shf/contracts';
 
 import {
+  formatCategoryLabel,
   formatCurrencyInCents,
   formatDate,
   formatMonthYear,
@@ -48,18 +49,18 @@ const defaultFilters: FilterFormState = {
 };
 
 const typeLabelByValue = {
-  expense: 'Saida',
+  expense: 'Saída',
   income: 'Entrada',
 } as const;
 
 const recordKindLabelByValue = {
-  creditCardPurchase: 'Compra no credito',
-  manualTransaction: 'Lancamento manual',
+  creditCardPurchase: 'Compra no crédito',
+  manualTransaction: 'Lançamento manual',
 } as const;
 
 const entityKindLabelByValue = {
   account: 'Conta',
-  creditCard: 'Cartao',
+  creditCard: 'Cartão',
 } as const;
 
 function buildAppliedFilters(values: FilterFormState): FinancialRecordFilter {
@@ -197,13 +198,8 @@ export function AnalyticsPage() {
   return (
     <section className="page-stack">
       <article className="dashboard-card hero-card">
-        <div className="eyebrow">Sprint 9</div>
+        <div className="eyebrow">Analytics</div>
         <h2>Analytics financeiro consolidado</h2>
-        <p>
-          Esta visao combina lancamentos manuais e compras no credito em um
-          unico fluxo de leitura, com filtros operacionais, consolidacao por
-          categoria, tags, entidade e mes.
-        </p>
       </article>
 
       <div className="panel-grid panel-grid-3">
@@ -224,7 +220,7 @@ export function AnalyticsPage() {
               </strong>
             </div>
             <div className="stat-item">
-              <span>Saidas</span>
+              <span>Saídas</span>
               <strong>
                 {formatCurrencyInCents(
                   -1 * (analyticsSnapshot?.totalExpenseInCents ?? 0),
@@ -253,18 +249,22 @@ export function AnalyticsPage() {
         </article>
 
         <article className="dashboard-card summary-card">
-          <div className="eyebrow">Leitura rapida</div>
+          <div className="eyebrow">Leitura rápida</div>
           <div className="detail-list">
             <div className="detail-item">
               <strong>Maior categoria</strong>
-              <span>{analyticsSnapshot?.byCategory[0]?.category ?? '--'}</span>
+              <span>
+                {analyticsSnapshot?.byCategory[0]?.category
+                  ? formatCategoryLabel(analyticsSnapshot.byCategory[0].category)
+                  : '--'}
+              </span>
             </div>
             <div className="detail-item">
               <strong>Tag dominante</strong>
               <span>{analyticsSnapshot?.byTag[0]?.tagName ?? '--'}</span>
             </div>
             <div className="detail-item">
-              <strong>Ultimo mes</strong>
+              <strong>Último mês</strong>
               <span>
                 {analyticsSnapshot?.byMonth[0]
                   ? formatMonthYear(analyticsSnapshot.byMonth[0].monthStart)
@@ -280,7 +280,7 @@ export function AnalyticsPage() {
           <div className="section-heading-row">
             <div>
               <div className="eyebrow">Filtros</div>
-              <h3>Recorte analitico</h3>
+              <h3>Recorte analítico</h3>
             </div>
             <button className="ghost-button" onClick={handleClearFilters} type="button">
               Limpar filtros
@@ -314,7 +314,7 @@ export function AnalyticsPage() {
                 >
                   <option value="">Todos</option>
                   <option value="income">Entrada</option>
-                  <option value="expense">Saida</option>
+                  <option value="expense">Saída</option>
                 </select>
               </label>
 
@@ -326,8 +326,8 @@ export function AnalyticsPage() {
                   value={filterForm.recordKind}
                 >
                   <option value="">Todas</option>
-                  <option value="manualTransaction">Lancamento manual</option>
-                  <option value="creditCardPurchase">Compra no credito</option>
+                  <option value="manualTransaction">Lançamento manual</option>
+                  <option value="creditCardPurchase">Compra no crédito</option>
                 </select>
               </label>
 
@@ -372,7 +372,7 @@ export function AnalyticsPage() {
                 >
                   <option value="">Todas</option>
                   <option value="account">Conta</option>
-                  <option value="creditCard">Cartao</option>
+                  <option value="creditCard">Cartão</option>
                 </select>
               </label>
 
@@ -410,7 +410,7 @@ export function AnalyticsPage() {
               </label>
 
               <label>
-                <span>Ate</span>
+                <span>Até</span>
                 <input
                   name="toDate"
                   onChange={handleFilterFieldChange}
@@ -443,7 +443,7 @@ export function AnalyticsPage() {
             </div>
             {editingTag ? (
               <button className="ghost-button" onClick={handleCancelTagEdit} type="button">
-                Cancelar edicao
+                Cancelar edição
               </button>
             ) : null}
           </div>
@@ -478,7 +478,7 @@ export function AnalyticsPage() {
           {tagsSnapshotQuery.isLoading ? (
             <p>Carregando tags...</p>
           ) : tags.length === 0 ? (
-            <p>Nenhuma tag cadastrada ate o momento.</p>
+            <p>Nenhuma tag cadastrada até o momento.</p>
           ) : (
             <div className="stack-list">
               {tags.map((tag) => (
@@ -542,7 +542,7 @@ export function AnalyticsPage() {
                       {entityKindLabelByValue[record.entityKind]} {record.entityName}
                     </span>
                     <small>
-                      {record.accountName} • {record.category} • {formatDate(record.occurrenceDate)}
+                      {record.accountName} • {formatCategoryLabel(record.category)} • {formatDate(record.occurrenceDate)}
                     </small>
                   </div>
                   <div className="entity-metrics">
@@ -588,7 +588,7 @@ export function AnalyticsPage() {
               {analyticsSnapshot?.byCategory.map((item) => (
                 <div className="entity-card" key={item.category}>
                   <div className="section-heading-row compact-row">
-                    <strong>{item.category}</strong>
+                    <strong>{formatCategoryLabel(item.category)}</strong>
                     <strong>{formatCurrencyInCents(item.netAmountInCents)}</strong>
                   </div>
                   <div className="stats-grid stats-grid-inline">
@@ -601,7 +601,7 @@ export function AnalyticsPage() {
                       <strong>{formatCurrencyInCents(item.incomeInCents)}</strong>
                     </div>
                     <div className="stat-item">
-                      <span>Saidas</span>
+                      <span>Saídas</span>
                       <strong>{formatCurrencyInCents(-1 * item.expenseInCents)}</strong>
                     </div>
                   </div>
@@ -635,7 +635,7 @@ export function AnalyticsPage() {
                       <strong>{formatCurrencyInCents(item.incomeInCents)}</strong>
                     </div>
                     <div className="stat-item">
-                      <span>Saidas</span>
+                      <span>Saídas</span>
                       <strong>{formatCurrencyInCents(-1 * item.expenseInCents)}</strong>
                     </div>
                   </div>
@@ -649,7 +649,7 @@ export function AnalyticsPage() {
       <div className="panel-grid panel-grid-2">
         <article className="dashboard-card">
           <div className="eyebrow">Entidades</div>
-          <h3>Impacto por conta e cartao</h3>
+          <h3>Impacto por conta e cartão</h3>
 
           {(analyticsSnapshot?.byEntity.length ?? 0) === 0 ? (
             <p>Nenhuma entidade encontrada para o recorte atual.</p>
@@ -674,7 +674,7 @@ export function AnalyticsPage() {
                       <strong>{formatCurrencyInCents(item.incomeInCents)}</strong>
                     </div>
                     <div className="stat-item">
-                      <span>Saidas</span>
+                      <span>Saídas</span>
                       <strong>{formatCurrencyInCents(-1 * item.expenseInCents)}</strong>
                     </div>
                   </div>
@@ -689,7 +689,7 @@ export function AnalyticsPage() {
           <h3>Impacto mensal</h3>
 
           {(analyticsSnapshot?.byMonth.length ?? 0) === 0 ? (
-            <p>Nenhum mes agregado para o recorte atual.</p>
+            <p>Nenhum mês agregado para o recorte atual.</p>
           ) : (
             <div className="stack-list">
               {analyticsSnapshot?.byMonth.map((item) => (
@@ -708,7 +708,7 @@ export function AnalyticsPage() {
                       <strong>{formatCurrencyInCents(item.incomeInCents)}</strong>
                     </div>
                     <div className="stat-item">
-                      <span>Saidas</span>
+                      <span>Saídas</span>
                       <strong>{formatCurrencyInCents(-1 * item.expenseInCents)}</strong>
                     </div>
                   </div>
