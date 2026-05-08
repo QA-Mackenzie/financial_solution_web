@@ -26,7 +26,14 @@ const sessionCookieOptions = {
   // Em producao no Render, frontend e API ficam em origins diferentes.
   // SameSite=None permite que o navegador reenvie a sessao nas chamadas CORS.
   sameSite: env.NODE_ENV === 'production' ? ('none' as const) : cookieOptions.sameSite,
+  // Alguns navegadores mais restritivos exigem CHIPS para aceitar o cookie
+  // third-party entre os subdominios publicos do Render.
+  partitioned: env.NODE_ENV === 'production',
 };
+
+function clearSessionCookie(reply: { clearCookie: (name: string, options: typeof sessionCookieOptions) => void; }) {
+  reply.clearCookie(env.SESSION_COOKIE_NAME, sessionCookieOptions);
+}
 
 function getAuthContext(request: {
   id: string;
@@ -59,7 +66,7 @@ export function authRoutes(authService: AuthService): FastifyPluginAsync {
     );
 
     if (!sessionResult) {
-      reply.clearCookie(env.SESSION_COOKIE_NAME, cookieOptions);
+      clearSessionCookie(reply);
       return reply.code(200).send({ session: null });
     }
 
@@ -131,7 +138,7 @@ export function authRoutes(authService: AuthService): FastifyPluginAsync {
     );
 
     if (!sessionResult) {
-      reply.clearCookie(env.SESSION_COOKIE_NAME, cookieOptions);
+      clearSessionCookie(reply);
       return reply.code(200).send({ session: null });
     }
 
@@ -186,7 +193,7 @@ export function authRoutes(authService: AuthService): FastifyPluginAsync {
       request.cookies[env.SESSION_COOKIE_NAME],
       getAuthContext(request),
     );
-    reply.clearCookie(env.SESSION_COOKIE_NAME, cookieOptions);
+    clearSessionCookie(reply);
 
     return reply.code(204).send();
   });
