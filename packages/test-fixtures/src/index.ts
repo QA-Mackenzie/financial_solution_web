@@ -1,4 +1,4 @@
-import type { LoginInput, RegisterInput, SessionPayload } from '@shf/contracts';
+import type { LoginInput, RegisterInput, SessionPayload } from '@economy-cash/contracts';
 
 export function makeRegisterInputFixture(
   overrides: Partial<RegisterInput> = {},

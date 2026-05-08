@@ -1,11 +1,11 @@
-import { sanitizeCategoryLabel } from '@shf/contracts';
+import { sanitizeCategoryLabel } from '@economy-cash/contracts';
 import {
   provisionStatuses,
   type CreateProvisionInput,
   type ProvisionStatus,
   type RedeemProvisionInput,
   type UpdateProvisionInput,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 
 type ValidatedProvisionInput = CreateProvisionInput | UpdateProvisionInput;
 

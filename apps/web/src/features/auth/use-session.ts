@@ -5,7 +5,7 @@ import type {
   PasswordResetRequestInput,
   RegisterInput,
   SessionPayload,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 
 import { authApi } from '../../lib/api';
 

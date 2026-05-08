@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import {
   passwordResetRequestInputSchema,
   type PasswordResetRequestInput,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router-dom';

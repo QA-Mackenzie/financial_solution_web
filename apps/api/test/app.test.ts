@@ -1,7 +1,7 @@
 import {
   makeLoginInputFixture,
   makeRegisterInputFixture,
-} from '@shf/test-fixtures';
+} from '@economy-cash/test-fixtures';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildApp } from '../src/app';
@@ -18,7 +18,7 @@ function makeDatabaseStub(): DatabaseClient {
   return {
     async checkHealth() {
       return {
-        database: 'shf_web',
+        database: 'economy_cash',
         latencyMs: 4,
         seededUsers: 1,
         status: 'up',
@@ -67,12 +67,12 @@ describe('api bootstrap', () => {
     expect(response.json()).toMatchObject({
       checks: {
         database: {
-          database: 'shf_web',
+          database: 'economy_cash',
           seededUsers: 1,
           status: 'up',
         },
       },
-      service: 'shf-web-api',
+      service: 'economy-cash-api',
       status: 'ok',
     });
     expect(response.headers['x-correlation-id']).toBe('health-check-001');

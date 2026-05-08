@@ -6,12 +6,12 @@ import type {
   ProvisionListItem,
   RedeemProvisionInput,
   VariableExpenseOverride,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 import {
   createProvisionInputSchema,
   redeemProvisionInputSchema,
   variableExpenseOverrideSchema,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 

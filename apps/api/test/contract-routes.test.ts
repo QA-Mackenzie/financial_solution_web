@@ -4,9 +4,9 @@ import type {
   ContractsSnapshot,
   HorizonSnapshot,
   SessionPayload,
-} from '@shf/contracts';
-import { contractsSnapshotSchema, horizonSnapshotSchema } from '@shf/contracts';
-import { makeRegisterInputFixture } from '@shf/test-fixtures';
+} from '@economy-cash/contracts';
+import { contractsSnapshotSchema, horizonSnapshotSchema } from '@economy-cash/contracts';
+import { makeRegisterInputFixture } from '@economy-cash/test-fixtures';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {

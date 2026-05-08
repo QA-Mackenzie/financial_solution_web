@@ -1,9 +1,9 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: shf-web-postgres
+    container_name: economy-cash-postgres
     environment:
-      POSTGRES_DB: shf_web
+      POSTGRES_DB: economy_cash
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:

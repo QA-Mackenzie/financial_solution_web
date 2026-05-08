@@ -6,13 +6,13 @@ import type {
   InstallmentPlanListItem,
   InstallmentsSnapshot,
   SessionPayload,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 import {
   creditCardsSnapshotSchema,
   horizonSnapshotSchema,
   installmentsSnapshotSchema,
-} from '@shf/contracts';
-import { makeRegisterInputFixture } from '@shf/test-fixtures';
+} from '@economy-cash/contracts';
+import { makeRegisterInputFixture } from '@economy-cash/test-fixtures';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {

@@ -1,7 +1,7 @@
 import type {
   ContractListItem,
   ContractsSnapshot,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 
 export interface BuildContractsSnapshotOptions {
   currentDate?: string;

@@ -6,8 +6,8 @@
 #
 # Se voce mantiver os nomes abaixo e o subdominio onrender.com ficar disponivel,
 # os valores esperados tendem a ser:
-# - WEB_ORIGIN=https://solucao-financeira-web-app.onrender.com
-# - VITE_API_URL=https://solucao-financeira-web-api.onrender.com
+# - WEB_ORIGIN=https://economy-cash-app.onrender.com
+# - VITE_API_URL=https://economy-cash-api.onrender.com
 #
 # Se o Render atribuir outro subdominio, ajuste esses dois valores no dashboard
 # apos o primeiro deploy.
@@ -19,23 +19,23 @@ previews:
   generation: off
 
 databases:
-  - name: solucao-financeira-web-db
+  - name: economy-cash-db
     plan: free
     postgresMajorVersion: "16"
-    databaseName: shf_web
-    user: shf_web
+    databaseName: economy_cash
+    user: economy_cash
 
 services:
   - type: web
-    name: solucao-financeira-web-api
+    name: economy-cash-api
     runtime: node
     plan: free
     numInstances: 1
     buildCommand: >-
       npm ci --include=dev &&
-      npm run build --workspace @shf/contracts &&
-      npm run build --workspace @shf/domain-core &&
-      npm run build --workspace @shf/api
+      npm run build --workspace @economy-cash/contracts &&
+      npm run build --workspace @economy-cash/domain-core &&
+      npm run build --workspace @economy-cash/api
     startCommand: node apps/api/dist/server.js
     healthCheckPath: /health
     autoDeployTrigger: commit
@@ -57,14 +57,14 @@ services:
         value: production
       - key: DATABASE_URL
         fromDatabase:
-          name: solucao-financeira-web-db
+          name: economy-cash-db
           property: connectionString
       - key: WEB_ORIGIN
         sync: false
       - key: SESSION_SECRET
         generateValue: true
       - key: SESSION_COOKIE_NAME
-        value: shf_session
+        value: economy_cash_session
       - key: SESSION_TTL_HOURS
         value: "168"
       - key: PASSWORD_RESET_TOKEN_TTL_MINUTES
@@ -77,13 +77,13 @@ services:
         value: info
 
   - type: web
-    name: solucao-financeira-web-app
+    name: economy-cash-app
     runtime: static
     buildCommand: >-
       npm ci --include=dev &&
-      npm run build --workspace @shf/contracts &&
-      npm run build --workspace @shf/domain-core &&
-      npm run build --workspace @shf/web
+      npm run build --workspace @economy-cash/contracts &&
+      npm run build --workspace @economy-cash/domain-core &&
+      npm run build --workspace @economy-cash/web
     staticPublishPath: apps/web/dist
     autoDeployTrigger: commit
     buildFilter:

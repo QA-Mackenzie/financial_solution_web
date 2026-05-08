@@ -5,7 +5,7 @@ import {
   type ContractType,
   type CreateContractInput,
   type UpdateContractInput,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 
 type ValidatedContractInput = CreateContractInput | UpdateContractInput;
 

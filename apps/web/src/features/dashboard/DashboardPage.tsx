@@ -1,6 +1,6 @@
 import {
   type FinancialHorizonMonth,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 
 import {
   formatCurrencyInCents,

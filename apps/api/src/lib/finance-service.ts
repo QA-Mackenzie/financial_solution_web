@@ -4,7 +4,7 @@ import {
   DEFAULT_UNCATEGORIZED_CATEGORY,
   DEFAULT_HORIZON_SAFETY_MARGIN_IN_CENTS,
   DEFAULT_VARIABLE_EXPENSE_WINDOW_IN_MONTHS,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 import type {
   Account,
   AccountListItem,
@@ -58,7 +58,7 @@ import type {
   VariableExpenseOverride,
   VariableExpenseOverrideListItem,
   VariableExpenseSnapshot,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 import {
   buildAccountsSnapshot,
   buildCombinedCreditCardFinancials,
@@ -87,7 +87,7 @@ import {
   validateProvisionRedeemInput,
   validateTagInput,
   validateTransactionInput,
-} from '@shf/domain-core';
+} from '@economy-cash/domain-core';
 
 import type { DatabaseClient, DatabaseExecutor } from './database';
 import { AppError } from './errors';

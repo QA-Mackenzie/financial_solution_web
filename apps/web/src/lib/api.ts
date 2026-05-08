@@ -51,7 +51,7 @@ import type {
   VariableExpenseOverride,
   VariableExpenseOverrideListItem,
   VariableExpenseSnapshot,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 
 const apiBaseUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 

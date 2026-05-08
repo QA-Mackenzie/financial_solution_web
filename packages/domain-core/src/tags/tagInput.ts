@@ -1,7 +1,7 @@
 import type {
   CreateTagInput,
   UpdateTagInput,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 
 type ValidatedTagInput = CreateTagInput | UpdateTagInput;
 

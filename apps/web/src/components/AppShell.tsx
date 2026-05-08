@@ -11,7 +11,7 @@ export function AppShell({ children }: PropsWithChildren) {
     <div className="app-shell">
       <aside className="sidebar">
         <div>
-          <div className="eyebrow">SHF Web</div>
+          <div className="eyebrow">Economy Cash</div>
           <h1>Painel inicial</h1>
         </div>
 

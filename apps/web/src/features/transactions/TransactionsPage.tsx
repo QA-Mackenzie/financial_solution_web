@@ -5,7 +5,7 @@ import {
   initialCategoryDefinitions,
   type CreateTransactionInput,
   type TransactionListItem,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 

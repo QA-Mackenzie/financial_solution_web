@@ -1,7 +1,7 @@
 import {
   DEFAULT_HORIZON_SAFETY_MARGIN_IN_CENTS,
   DEFAULT_VARIABLE_EXPENSE_WINDOW_IN_MONTHS,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 import {
   buildFinancialHorizon,
   buildProjectedCreditCardInvoiceOccurrences,
@@ -9,7 +9,7 @@ import {
   marginPressureFixture,
   multiAccountConsolidatedFixture,
   positiveTrajectoryFixture,
-} from '@shf/domain-core';
+} from '@economy-cash/domain-core';
 import { describe, expect, it } from 'vitest';
 
 import { buildOfficialHorizonSnapshot } from '../src/lib/horizon-snapshot';

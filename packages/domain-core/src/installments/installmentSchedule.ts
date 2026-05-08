@@ -4,7 +4,7 @@ import type {
   InstallmentPlanListItem,
   ProjectedInstallmentCreditCardPurchase,
   ProjectedInstallmentOccurrence,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 
 const getDaysInMonth = (year: number, monthIndex: number) =>
   new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();

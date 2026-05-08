@@ -50,7 +50,7 @@ import {
   variableExpenseOverrideListItemSchema,
   variableExpenseOverrideSchema,
   variableExpenseSnapshotSchema,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 import { z } from 'zod';
 
 import { env } from '../config';

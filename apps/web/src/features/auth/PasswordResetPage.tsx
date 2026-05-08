@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { passwordResetInputSchema, type PasswordResetInput } from '@shf/contracts';
+import { passwordResetInputSchema, type PasswordResetInput } from '@economy-cash/contracts';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';

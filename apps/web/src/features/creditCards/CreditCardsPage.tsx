@@ -10,7 +10,7 @@ import {
   type CreditCardInvoicePreview,
   type CreditCardListItem,
   type CreditCardPurchaseListItem,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 

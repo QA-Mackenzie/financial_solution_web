@@ -5,7 +5,7 @@ import {
   type InstallmentSourceType,
   type UpdateInstallmentAnticipationInput,
   type UpdateInstallmentPlanInput,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 
 type ValidatedInstallmentPlanInput =
   | CreateInstallmentPlanInput

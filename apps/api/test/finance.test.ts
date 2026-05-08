@@ -1,5 +1,5 @@
-import type { SessionPayload } from '@shf/contracts';
-import { makeRegisterInputFixture } from '@shf/test-fixtures';
+import type { SessionPayload } from '@economy-cash/contracts';
+import { makeRegisterInputFixture } from '@economy-cash/test-fixtures';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { FinancialDataAccess } from '../src/lib/finance-repositories';
@@ -207,7 +207,7 @@ describe('financial repositories', () => {
       aliceSession.userId,
       {
         sourceChecksum: 'sqlite-demo-checksum',
-        sourcePath: 'C:/temp/shf-desktop.sqlite',
+        sourcePath: 'C:/temp/economy-cash-desktop.sqlite',
         summary: {
           detectedTables: ['accounts', 'transactions'],
         },

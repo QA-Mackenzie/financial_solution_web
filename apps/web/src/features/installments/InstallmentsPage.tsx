@@ -6,11 +6,11 @@ import type {
   InstallmentOperation,
   InstallmentPlanListItem,
   ProjectedInstallmentCreditCardPurchase,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 import {
   anticipateInstallmentPlanInputSchema,
   createInstallmentPlanInputSchema,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 

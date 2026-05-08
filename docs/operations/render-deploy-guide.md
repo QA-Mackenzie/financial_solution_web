@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Publicar a SHF Web no Render importando somente o Blueprint [render.yaml](render.yaml).
+Publicar a Economy Cash no Render importando somente o Blueprint [render.yaml](render.yaml).
 
 Este guia considera a limitacao do plano free: o Render nao aceita preDeployCommand em servicos free. Por isso, o projeto foi ajustado para a API aplicar o schema base automaticamente ao iniciar, antes de abrir a porta.
 
@@ -10,9 +10,9 @@ Este guia considera a limitacao do plano free: o Render nao aceita preDeployComm
 
 Ao importar o [render.yaml](render.yaml), o Render provisiona:
 
-1. PostgreSQL gerenciado: solucao-financeira-web-db
-2. Web Service da API: solucao-financeira-web-api
-3. Static Site do frontend: solucao-financeira-web-app
+1. PostgreSQL gerenciado: economy-cash-db
+2. Web Service da API: economy-cash-api
+3. Static Site do frontend: economy-cash-app
 
 O Blueprint tambem ja define:
 
@@ -36,8 +36,8 @@ Use a URL publica da API.
 
 Se os nomes do Blueprint forem mantidos e os subdominios estiverem disponiveis, os valores tendem a ser:
 
-- WEB_ORIGIN = https://solucao-financeira-web-app.onrender.com
-- VITE_API_URL = https://solucao-financeira-web-api.onrender.com
+- WEB_ORIGIN = https://economy-cash-app.onrender.com
+- VITE_API_URL = https://economy-cash-api.onrender.com
 
 ## Variaveis que o Blueprint resolve sozinho
 
@@ -84,12 +84,12 @@ Resumo:
 Depois da importacao, futuras alteracoes ficam no dashboard de cada servico:
 
 1. API
-Servico: solucao-financeira-web-api
+Servico: economy-cash-api
 Tela: Environment
 Variavel: WEB_ORIGIN
 
 2. Frontend
-Servico: solucao-financeira-web-app
+Servico: economy-cash-app
 Tela: Environment
 Variavel: VITE_API_URL
 

@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import type { AccountListItem, CreateAccountInput } from '@shf/contracts';
-import { createAccountInputSchema } from '@shf/contracts';
+import type { AccountListItem, CreateAccountInput } from '@economy-cash/contracts';
+import { createAccountInputSchema } from '@economy-cash/contracts';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 

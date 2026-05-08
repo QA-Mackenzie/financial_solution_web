@@ -4,12 +4,12 @@ import type {
   CreateContractAdjustmentInput,
   CreateContractInput,
   EndContractInput,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 import {
   createContractAdjustmentInputSchema,
   createContractInputSchema,
   endContractInputSchema,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 

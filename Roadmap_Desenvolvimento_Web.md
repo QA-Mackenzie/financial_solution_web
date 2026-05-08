@@ -1,8 +1,8 @@
-# Roadmap Detalhado de Desenvolvimento Web - SHF
+# Roadmap Detalhado de Desenvolvimento Web - Economy Cash
 
 ## Objetivo do documento
 
-Este documento e autonomo e descreve apenas o desenvolvimento da versao web da SHF. Ele nao depende do roadmap desktop atual e parte do principio de que a versao web sera um produto novo em arquitetura, reaproveitando somente o que fizer sentido da base existente: dominio puro, contratos compartilhados, regras financeiras e testes de regressao.
+Este documento e autonomo e descreve apenas o desenvolvimento da versao web da Economy Cash. Ele nao depende do roadmap desktop atual e parte do principio de que a versao web sera um produto novo em arquitetura, reaproveitando somente o que fizer sentido da base existente: dominio puro, contratos compartilhados, regras financeiras e testes de regressao.
 
 ## Base considerada para este roadmap
 
@@ -131,7 +131,7 @@ O time consegue clonar o novo repositorio, subir app e API localmente, conectar 
 
 ### Validacao executada
 
-- npm run test --workspace @shf/api
+- npm run test --workspace @economy-cash/api
 - npm run check
 - docker compose -f infra/docker-compose.yml config
 - npm run infra:up
@@ -185,9 +185,9 @@ Um usuario consegue criar conta, autenticar, encerrar sessao e acessar a shell p
 
 ### Validacao executada
 
-- npm run test --workspace @shf/api
-- npm run test --workspace @shf/domain-core
-- npm run test --workspace @shf/web
+- npm run test --workspace @economy-cash/api
+- npm run test --workspace @economy-cash/domain-core
+- npm run test --workspace @economy-cash/web
 - npm run check
 - npm run infra:up
 - npm run db:check
@@ -238,10 +238,10 @@ A aplicacao possui base relacional segura, com isolamento por usuario comprovado
 
 ### Validacao executada
 
-- npm run test --workspace @shf/api -- test/finance.test.ts
-- npm run test --workspace @shf/api
-- npm run test --workspace @shf/domain-core
-- npm run test --workspace @shf/web
+- npm run test --workspace @economy-cash/api -- test/finance.test.ts
+- npm run test --workspace @economy-cash/api
+- npm run test --workspace @economy-cash/domain-core
+- npm run test --workspace @economy-cash/web
 - npm run check
 - npm run infra:up
 - npm run db:check
@@ -300,12 +300,12 @@ O usuario consegue montar sua base financeira atual na web e o sistema responde 
 
 ### Validacao executada
 
-- npm run typecheck --workspace @shf/contracts
-- npm run typecheck --workspace @shf/api
-- npm run typecheck --workspace @shf/web
-- npm run test --workspace @shf/api -- test/finance-routes.test.ts
-- npm run test --workspace @shf/api
-- npm run test --workspace @shf/web
+- npm run typecheck --workspace @economy-cash/contracts
+- npm run typecheck --workspace @economy-cash/api
+- npm run typecheck --workspace @economy-cash/web
+- npm run test --workspace @economy-cash/api -- test/finance-routes.test.ts
+- npm run test --workspace @economy-cash/api
+- npm run test --workspace @economy-cash/web
 
 ---
 
@@ -359,9 +359,9 @@ O horizonte deixa de ser logica acoplada a UI e passa a ser um servico oficial, 
 
 ### Validacao executada
 
-- npm run test --workspace @shf/api -- test/horizon-projection.test.ts test/horizon-routes.test.ts
-- npm run test --workspace @shf/web
-- npm run test --workspace @shf/api
+- npm run test --workspace @economy-cash/api -- test/horizon-projection.test.ts test/horizon-routes.test.ts
+- npm run test --workspace @economy-cash/web
+- npm run test --workspace @economy-cash/api
 - npm run check
 - npm run infra:up
 - npm run db:check
@@ -418,12 +418,12 @@ Receitas e despesas recorrentes passam a ser calculadas automaticamente na web c
 
 ### Validacao executada
 
-- npm run test --workspace @shf/api -- horizon-projection.test.ts
-- npm run test --workspace @shf/api -- contract-routes.test.ts
-- npm run test --workspace @shf/web -- App.test.tsx
-- npm run test --workspace @shf/api
-- npm run typecheck --workspace @shf/web
-- npm run test --workspace @shf/web
+- npm run test --workspace @economy-cash/api -- horizon-projection.test.ts
+- npm run test --workspace @economy-cash/api -- contract-routes.test.ts
+- npm run test --workspace @economy-cash/web -- App.test.tsx
+- npm run test --workspace @economy-cash/api
+- npm run typecheck --workspace @economy-cash/web
+- npm run test --workspace @economy-cash/web
 - npm run check
 - npm run infra:up
 - npm run db:check
@@ -484,11 +484,11 @@ O sistema web representa credito sem distorcer o caixa atual e sem perder equiva
 
 ### Validacao executada
 
-- npm run test --workspace @shf/api -- credit-card-routes.test.ts horizon-projection.test.ts
-- npm run test --workspace @shf/web -- App.test.tsx
-- npm run test --workspace @shf/api
-- npm run test --workspace @shf/web
-- npm run typecheck --workspace @shf/web
+- npm run test --workspace @economy-cash/api -- credit-card-routes.test.ts horizon-projection.test.ts
+- npm run test --workspace @economy-cash/web -- App.test.tsx
+- npm run test --workspace @economy-cash/api
+- npm run test --workspace @economy-cash/web
+- npm run typecheck --workspace @economy-cash/web
 - npm run check ate o build do frontend, com lint, typecheck e testes completos aprovados no workspace
 - build do frontend validado com Node 20 via npx --yes node@20 ../../node_modules/typescript/bin/tsc --project tsconfig.json e npx --yes node@20 ../../node_modules/vite/bin/vite.js build --config vite.config.mts em apps/web
 
@@ -566,7 +566,7 @@ Parcelamentos passam a ser uma feature confiavel na web, com recalculo transpare
 ### Observacoes de ambiente
 
 - o build completo do monorepo foi validado com Node 20 sobre o npm global da maquina porque o frontend usa Vite 7 e o Node global 18.20.8 continua abaixo do requisito minimo
-- Docker Desktop e Postgres local estavam disponiveis nesta validacao; npm run infra:up subiu o container shf-web-postgres e npm run db:check retornou status up
+- Docker Desktop e Postgres local estavam disponiveis nesta validacao; npm run infra:up subiu o container economy-cash-postgres e npm run db:check retornou status up
 
 ---
 
@@ -637,7 +637,7 @@ O horizonte web passa a representar nao apenas o historico e o fixo, mas tambem 
 ### Observacoes de ambiente
 
 - o build completo do monorepo foi validado com Node 20 sobre o npm global da maquina porque o frontend usa Vite 7 e o Node global 18.20.8 continua abaixo do requisito minimo
-- Docker Desktop e Postgres local estavam disponiveis nesta validacao; npm run infra:up manteve o container shf-web-postgres ativo e npm run db:check retornou status up
+- Docker Desktop e Postgres local estavam disponiveis nesta validacao; npm run infra:up manteve o container economy-cash-postgres ativo e npm run db:check retornou status up
 
 ---
 

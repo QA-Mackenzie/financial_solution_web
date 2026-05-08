@@ -2,7 +2,7 @@ import type {
   ManualTransaction,
   TransactionListItem,
   TransactionsSnapshot,
-} from '@shf/contracts';
+} from '@economy-cash/contracts';
 
 export const getSignedAmountInCents = (
   transaction: Pick<ManualTransaction, 'type' | 'amountInCents'>,

@@ -1,5 +1,5 @@
-﻿import type { AccountsSnapshot } from '@shf/contracts';
-import type { TransactionsSnapshot } from '@shf/contracts';
+import type { AccountsSnapshot } from '@economy-cash/contracts';
+import type { TransactionsSnapshot } from '@economy-cash/contracts';
 
 import type { BuildFinancialHorizonOptions } from './financialHorizon';
 

@@ -1,4 +1,4 @@
-import type { FinancialRecordListItem } from '@shf/contracts';
+import type { FinancialRecordListItem } from '@economy-cash/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
