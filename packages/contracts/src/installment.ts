@@ -110,15 +110,15 @@ export const installmentsSnapshotSchema = z.object({
 const createInstallmentPlanInputBaseSchema = z.object({
   sourceType: installmentSourceTypeSchema,
   accountId: z.string().uuid('Selecione uma conta para o parcelamento.').optional(),
-  creditCardId: z.string().uuid('Selecione um cartao para o parcelamento.').optional(),
+  creditCardId: z.string().uuid('Selecione um cartão para o parcelamento.').optional(),
   description: z
     .string()
-    .min(1, 'Informe uma descricao para o parcelamento.')
-    .max(120, 'A descricao do parcelamento deve ter no maximo 120 caracteres.'),
+    .min(1, 'Informe uma descrição para o parcelamento.')
+    .max(120, 'A descrição do parcelamento deve ter no máximo 120 caracteres.'),
   totalAmountInCents: z
     .number()
     .int(
-      'O valor total do parcelamento deve ser informado em centavos inteiros.',
+      'O valor total do parcelamento deve ser informado corretamente.',
     )
     .positive('O valor total do parcelamento deve ser maior que zero.'),
   installmentCount: z
@@ -128,7 +128,7 @@ const createInstallmentPlanInputBaseSchema = z.object({
     .max(60, 'A quantidade de parcelas deve ficar entre 2 e 60.'),
   firstOccurrenceDate: z.string().regex(
     /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/,
-    'Informe uma data inicial valida no formato AAAA-MM-DD.',
+    'Informe uma data inicial válida no formato AAAA-MM-DD.',
   ),
 });
 
@@ -145,7 +145,7 @@ export const createInstallmentPlanInputSchema =
     if (value.sourceType === 'creditCard' && !value.creditCardId) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Selecione um cartao para o parcelamento.',
+        message: 'Selecione um cartão para o parcelamento.',
         path: ['creditCardId'],
       });
     }
@@ -177,7 +177,7 @@ export const updateInstallmentPlanInputSchema =
       if (value.sourceType === 'creditCard' && !value.creditCardId) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'Selecione um cartao para o parcelamento.',
+          message: 'Selecione um cartão para o parcelamento.',
           path: ['creditCardId'],
         });
       }
@@ -196,7 +196,7 @@ const anticipateInstallmentPlanInputBaseSchema = z.object({
   planId: z.string().uuid('Selecione um parcelamento para antecipar.'),
   operationDate: z.string().regex(
     /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/,
-    'Informe uma data valida para a antecipacao no formato AAAA-MM-DD.',
+    'Informe uma data válida para a antecipação no formato AAAA-MM-DD.',
   ),
   affectedInstallmentCount: z
     .number()

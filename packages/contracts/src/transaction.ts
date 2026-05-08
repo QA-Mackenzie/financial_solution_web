@@ -31,14 +31,14 @@ export const transactionsSnapshotSchema = z.object({
 });
 
 export const createTransactionInputSchema = z.object({
-  accountId: z.string().uuid('Selecione uma conta valida.'),
+  accountId: z.string().uuid('Selecione uma conta válida.'),
   amountInCents: z.number().int().positive('Informe um valor maior que zero.'),
   category: z.string().optional(),
-  description: z.string().min(1, 'Informe uma descricao para o lancamento.'),
+  description: z.string().min(1, 'Informe uma descrição para o lançamento.'),
   tagIds: z.array(z.string().uuid()).optional(),
   transactionDate: z.string().regex(
     /^\d{4}-\d{2}-\d{2}$/,
-    'Informe uma data valida no formato AAAA-MM-DD.',
+    'Informe uma data válida no formato AAAA-MM-DD.',
   ),
   type: transactionTypeSchema,
 });
@@ -67,11 +67,11 @@ export const variableExpenseOverrideListItemSchema =
   });
 
 export const removeVariableExpenseOverrideInputSchema = z.object({
-  accountId: z.string().uuid('Selecione uma conta valida.'),
-  description: z.string().min(1, 'Informe a descricao da despesa variavel.'),
+  accountId: z.string().uuid('Selecione uma conta válida.'),
+  description: z.string().min(1, 'Informe a descrição da despesa variável.'),
   occurrenceDate: z.string().regex(
     /^\d{4}-\d{2}-\d{2}$/,
-    'Informe uma data valida no formato AAAA-MM-DD.',
+    'Informe uma data válida no formato AAAA-MM-DD.',
   ),
 });
 

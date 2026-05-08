@@ -4,6 +4,7 @@ import { createAccountInputSchema } from '@shf/contracts';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 
+import { CurrencyInput } from '../../components/CurrencyInput';
 import { formatCurrencyInCents } from '../../lib/finance-format';
 import {
   useAccountsSnapshotQuery,
@@ -18,6 +19,14 @@ const accountDefaultValues: CreateAccountInput = {
   type: 'checking',
 };
 
+const accountTypeLabelByValue = {
+  cash: 'Dinheiro',
+  checking: 'Conta corrente',
+  investment: 'Investimento',
+  other: 'Outro',
+  savings: 'Poupança',
+} as const;
+
 export function AccountsPage() {
   const [editingAccount, setEditingAccount] = useState<AccountListItem | null>(null);
   const accountsSnapshotQuery = useAccountsSnapshotQuery();
@@ -25,6 +34,7 @@ export function AccountsPage() {
   const updateAccountMutation = useUpdateAccountMutation();
   const archiveAccountMutation = useArchiveAccountMutation();
   const {
+    control,
     handleSubmit,
     register,
     reset,
@@ -71,13 +81,8 @@ export function AccountsPage() {
   return (
     <section className="page-stack">
       <article className="dashboard-card hero-card">
-        <div className="eyebrow">Sprint 3</div>
+        <div className="eyebrow">Contas</div>
         <h2>Contas e saldo atual</h2>
-        <p>
-          Cadastre, edite e arquive contas para formar a base do saldo atual da
-          SHF Web. O saldo consolidado abaixo ja considera os lancamentos
-          manuais ativos do usuario autenticado.
-        </p>
       </article>
 
       <div className="panel-grid panel-grid-2">
@@ -89,7 +94,7 @@ export function AccountsPage() {
             </div>
             {editingAccount ? (
               <button className="ghost-button" onClick={cancelEditing} type="button">
-                Cancelar edicao
+                Cancelar edição
               </button>
             ) : null}
           </div>
@@ -105,7 +110,7 @@ export function AccountsPage() {
               <span>Tipo</span>
               <select {...register('type')}>
                 <option value="checking">Conta corrente</option>
-                <option value="savings">Poupanca</option>
+                <option value="savings">Poupança</option>
                 <option value="cash">Dinheiro</option>
                 <option value="investment">Investimento</option>
                 <option value="other">Outro</option>
@@ -114,12 +119,8 @@ export function AccountsPage() {
             </label>
 
             <label>
-              <span>Saldo inicial em centavos</span>
-              <input
-                {...register('openingBalanceInCents', { valueAsNumber: true })}
-                placeholder="0"
-                type="number"
-              />
+              <span>Saldo inicial em reais</span>
+              <CurrencyInput control={control} name="openingBalanceInCents" />
               <small>{errors.openingBalanceInCents?.message}</small>
             </label>
 
@@ -179,7 +180,7 @@ export function AccountsPage() {
                 <div className="entity-card" key={account.id}>
                   <div>
                     <strong>{account.name}</strong>
-                    <span>{account.type}</span>
+                    <span>{accountTypeLabelByValue[account.type]}</span>
                   </div>
                   <div className="entity-metrics">
                     <span>Saldo atual</span>
@@ -212,18 +213,18 @@ export function AccountsPage() {
         </article>
 
         <article className="dashboard-card">
-          <div className="eyebrow">Historico</div>
+          <div className="eyebrow">Histórico</div>
           <h3>Contas arquivadas</h3>
 
           {archivedAccounts.length === 0 ? (
-            <p>Nenhuma conta arquivada ate o momento.</p>
+            <p>Nenhuma conta arquivada até o momento.</p>
           ) : (
             <div className="stack-list">
               {archivedAccounts.map((account) => (
                 <div className="entity-card" key={account.id}>
                   <div>
                     <strong>{account.name}</strong>
-                    <span>{account.type}</span>
+                    <span>{accountTypeLabelByValue[account.type]}</span>
                   </div>
                   <div className="entity-metrics">
                     <span>Saldo final</span>

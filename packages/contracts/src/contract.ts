@@ -50,15 +50,15 @@ export const contractsSnapshotSchema = z.object({
 });
 
 export const createContractInputSchema = z.object({
-  accountId: z.string().uuid('Selecione uma conta valida.'),
+  accountId: z.string().uuid('Selecione uma conta válida.'),
   name: z
     .string()
     .min(1, 'Informe um nome para o contrato.')
-    .max(120, 'O nome do contrato deve ter no maximo 120 caracteres.'),
+    .max(120, 'O nome do contrato deve ter no máximo 120 caracteres.'),
   category: z
     .string()
     .min(1, 'Informe uma categoria para o contrato.')
-    .max(80, 'A categoria do contrato deve ter no maximo 80 caracteres.'),
+    .max(80, 'A categoria do contrato deve ter no máximo 80 caracteres.'),
   type: contractTypeSchema,
   amountInCents: z
     .number()
@@ -71,7 +71,7 @@ export const createContractInputSchema = z.object({
     .max(31, 'O dia de vencimento do contrato deve estar entre 1 e 31.'),
   startDate: z.string().regex(
     /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/,
-    'Informe uma data inicial valida no formato AAAA-MM-DD.',
+    'Informe uma data inicial válida no formato AAAA-MM-DD.',
   ),
   status: contractStatusSchema,
 });
@@ -88,7 +88,7 @@ export const createContractAdjustmentInputSchema = z.object({
     .positive('O valor do reajuste deve ser maior que zero.'),
   effectiveStartDate: z.string().regex(
     /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/,
-    'Informe uma data efetiva valida no formato AAAA-MM-DD.',
+    'Informe uma data efetiva válida no formato AAAA-MM-DD.',
   ),
 });
 
@@ -96,7 +96,7 @@ export const endContractInputSchema = z.object({
   contractId: z.string().uuid(),
   endDate: z.string().regex(
     /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/,
-    'Informe uma data final valida no formato AAAA-MM-DD.',
+    'Informe uma data final válida no formato AAAA-MM-DD.',
   ),
 });
 

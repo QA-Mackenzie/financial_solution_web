@@ -6,7 +6,6 @@ import type {
   ProvisionListItem,
   RedeemProvisionInput,
   VariableExpenseOverride,
-  VariableExpenseOverrideListItem,
 } from '@shf/contracts';
 import {
   createProvisionInputSchema,
@@ -16,13 +15,17 @@ import {
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 
-import { formatCurrencyInCents, formatDate } from '../../lib/finance-format';
+import { CurrencyInput } from '../../components/CurrencyInput';
+import {
+  formatCategoryLabel,
+  formatCurrencyInCents,
+  formatDate,
+} from '../../lib/finance-format';
 import {
   useAccountsSnapshotQuery,
   useCreateProvisionMutation,
   useProvisionsSnapshotQuery,
   useRedeemProvisionMutation,
-  useRemoveVariableExpenseOverrideMutation,
   useUpdateProvisionMutation,
   useUpsertVariableExpenseOverrideMutation,
   useVariableExpenseSnapshotQuery,
@@ -54,7 +57,7 @@ const overrideDefaultValues: VariableExpenseOverride = {
 function getProvisionOccurrenceLabel(occurrence: ProjectedProvisionOccurrence) {
   return occurrence.kind === 'allocation'
     ? 'Reserva mensal'
-    : 'Liberacao no resgate';
+    : 'Liberação no resgate';
 }
 
 function getProvisionOccurrencePillClass(occurrence: ProjectedProvisionOccurrence) {
@@ -68,7 +71,7 @@ function getVariableExpenseSourceLabel(
 ) {
   return occurrence.source === 'manualOverride'
     ? 'Override manual'
-    : 'Media movel';
+    : 'Média móvel';
 }
 
 function getVariableExpenseSourcePillClass(
@@ -89,8 +92,8 @@ export function ProvisionsPage() {
   const updateProvisionMutation = useUpdateProvisionMutation();
   const redeemProvisionMutation = useRedeemProvisionMutation();
   const upsertOverrideMutation = useUpsertVariableExpenseOverrideMutation();
-  const removeOverrideMutation = useRemoveVariableExpenseOverrideMutation();
   const {
+    control: provisionControl,
     handleSubmit: handleProvisionSubmit,
     register: registerProvision,
     reset: resetProvision,
@@ -111,6 +114,7 @@ export function ProvisionsPage() {
     defaultValues: redeemDefaultValues,
   });
   const {
+    control: overrideControl,
     handleSubmit: handleOverrideSubmit,
     register: registerOverride,
     reset: resetOverride,
@@ -134,8 +138,7 @@ export function ProvisionsPage() {
     createProvisionMutation.error ??
     updateProvisionMutation.error ??
     redeemProvisionMutation.error;
-  const overrideMutationError =
-    upsertOverrideMutation.error ?? removeOverrideMutation.error;
+  const overrideMutationError = upsertOverrideMutation.error;
 
   useEffect(() => {
     if (firstAvailableAccountId && !editingProvision) {
@@ -222,33 +225,11 @@ export function ProvisionsPage() {
     setRedeemValue('redeemedAt', provision.targetDate);
   }
 
-  function prepareOverride(override: VariableExpenseOverrideListItem) {
-    resetOverride({
-      accountId: override.accountId,
-      amountInCents: override.amountInCents,
-      description: override.description,
-      occurrenceDate: override.occurrenceDate,
-    });
-  }
-
-  async function removeOverride(override: VariableExpenseOverrideListItem) {
-    await removeOverrideMutation.mutateAsync({
-      accountId: override.accountId,
-      description: override.description,
-      occurrenceDate: override.occurrenceDate,
-    });
-  }
-
   return (
     <section className="page-stack">
       <article className="dashboard-card hero-card">
-        <div className="eyebrow">Sprint 8</div>
-        <h2>Provisoes e despesas variaveis futuras</h2>
-        <p>
-          Planeje reservas por meta, acompanhe a distribuicao mensal da blindagem
-          de caixa e sobrescreva meses futuros da media movel quando o valor
-          previsto precisar de intervencao manual.
-        </p>
+        <div className="eyebrow">Planejamento</div>
+        <h2>Provisões e despesas variáveis futuras</h2>
       </article>
 
       <div className="panel-grid panel-grid-2">
@@ -256,7 +237,7 @@ export function ProvisionsPage() {
           <div className="section-heading-row">
             <div>
               <div className="eyebrow">Reserva</div>
-              <h3>{editingProvision ? 'Editar provisao' : 'Nova provisao'}</h3>
+              <h3>{editingProvision ? 'Editar provisão' : 'Nova provisão'}</h3>
             </div>
             {editingProvision ? (
               <button
@@ -264,13 +245,13 @@ export function ProvisionsPage() {
                 onClick={cancelEditingProvision}
                 type="button"
               >
-                Cancelar edicao
+                Cancelar edição
               </button>
             ) : null}
           </div>
 
           {availableAccounts.length === 0 ? (
-            <p>Cadastre uma conta ativa antes de criar provisoes.</p>
+            <p>Cadastre uma conta ativa antes de criar provisões.</p>
           ) : (
             <form className="finance-form" onSubmit={onSubmitProvision}>
               <label>
@@ -286,7 +267,7 @@ export function ProvisionsPage() {
               </label>
 
               <label>
-                <span>Descricao</span>
+                <span>Descrição</span>
                 <input
                   {...registerProvision('description')}
                   placeholder="Ex.: IPVA, seguro anual, viagem"
@@ -302,19 +283,16 @@ export function ProvisionsPage() {
 
               <div className="settings-grid">
                 <label>
-                  <span>Meta em centavos</span>
-                  <input
-                    {...registerProvision('targetAmountInCents', {
-                      valueAsNumber: true,
-                    })}
-                    min={1}
-                    type="number"
+                  <span>Meta em reais</span>
+                  <CurrencyInput
+                    control={provisionControl}
+                    name="targetAmountInCents"
                   />
                   <small>{provisionErrors.targetAmountInCents?.message}</small>
                 </label>
 
                 <label>
-                  <span>Inicio da reserva</span>
+                  <span>Início da reserva</span>
                   <input {...registerProvision('startDate')} type="date" />
                   <small>{provisionErrors.startDate?.message}</small>
                 </label>
@@ -341,8 +319,8 @@ export function ProvisionsPage() {
                 {createProvisionMutation.isPending || updateProvisionMutation.isPending
                   ? 'Salvando...'
                   : editingProvision
-                    ? 'Atualizar provisao'
-                    : 'Criar provisao'}
+                    ? 'Atualizar provisão'
+                    : 'Criar provisão'}
               </button>
             </form>
           )}
@@ -352,16 +330,16 @@ export function ProvisionsPage() {
           <div className="section-heading-row">
             <div>
               <div className="eyebrow">Resgate</div>
-              <h3>Fechar provisao ativa</h3>
+              <h3>Fechar provisão ativa</h3>
             </div>
           </div>
 
           {activeProvisions.length === 0 ? (
-            <p>Nenhuma provisao ativa para resgatar.</p>
+            <p>Nenhuma provisão ativa para resgatar.</p>
           ) : (
             <form className="finance-form" onSubmit={onSubmitRedeem}>
               <label>
-                <span>Provisao</span>
+                <span>Provisão</span>
                 <select {...registerRedeem('provisionId')}>
                   {activeProvisions.map((provision) => (
                     <option key={provision.id} value={provision.id}>
@@ -399,12 +377,12 @@ export function ProvisionsPage() {
           <div className="section-heading-row">
             <div>
               <div className="eyebrow">Override</div>
-              <h3>Despesa variavel futura</h3>
+              <h3>Despesa variável futura</h3>
             </div>
           </div>
 
           {availableAccounts.length === 0 ? (
-            <p>Cadastre uma conta ativa antes de sobrescrever a media movel.</p>
+            <p>Cadastre uma conta ativa antes de sobrescrever a média móvel.</p>
           ) : (
             <form className="finance-form" onSubmit={onSubmitOverride}>
               <label>
@@ -420,7 +398,7 @@ export function ProvisionsPage() {
               </label>
 
               <label>
-                <span>Descricao da serie</span>
+                <span>Descrição da série</span>
                 <input
                   {...registerOverride('description')}
                   placeholder="Ex.: supermercado, energia, combustivel"
@@ -430,18 +408,14 @@ export function ProvisionsPage() {
 
               <div className="settings-grid">
                 <label>
-                  <span>Mes futuro</span>
+                  <span>Mês futuro</span>
                   <input {...registerOverride('occurrenceDate')} type="date" />
                   <small>{overrideErrors.occurrenceDate?.message}</small>
                 </label>
 
                 <label>
-                  <span>Novo valor em centavos</span>
-                  <input
-                    {...registerOverride('amountInCents', { valueAsNumber: true })}
-                    min={1}
-                    type="number"
-                  />
+                  <span>Novo valor em reais</span>
+                  <CurrencyInput control={overrideControl} name="amountInCents" />
                   <small>{overrideErrors.amountInCents?.message}</small>
                 </label>
               </div>
@@ -483,7 +457,7 @@ export function ProvisionsPage() {
               <strong>{overrides.length}</strong>
             </div>
             <div className="stat-item">
-              <span>Series variaveis projetadas</span>
+              <span>Séries variáveis projetadas</span>
               <strong>{projectedVariableExpenses.length}</strong>
             </div>
           </div>
@@ -495,12 +469,12 @@ export function ProvisionsPage() {
           <div className="section-heading-row">
             <div>
               <div className="eyebrow">Carteira</div>
-              <h3>Provisoes cadastradas</h3>
+              <h3>Provisões cadastradas</h3>
             </div>
           </div>
 
           {activeProvisions.length === 0 && redeemedProvisions.length === 0 ? (
-            <p>Nenhuma provisao registrada ainda.</p>
+            <p>Nenhuma provisão registrada ainda.</p>
           ) : (
             <div className="stack-list">
               {activeProvisions.map((provision) => (
@@ -523,12 +497,12 @@ export function ProvisionsPage() {
                       </strong>
                     </div>
                     <div className="stat-item">
-                      <span>Inicio</span>
+                      <span>Início</span>
                       <strong>{formatDate(provision.startDate)}</strong>
                     </div>
                     <div className="stat-item">
                       <span>Categoria</span>
-                      <strong>{provision.category}</strong>
+                      <strong>{formatCategoryLabel(provision.category)}</strong>
                     </div>
                   </div>
 
@@ -538,7 +512,7 @@ export function ProvisionsPage() {
                       onClick={() => startEditingProvision(provision)}
                       type="button"
                     >
-                      Editar provisao
+                      Editar provisão
                     </button>
                     <button
                       className="ghost-button"
@@ -553,7 +527,7 @@ export function ProvisionsPage() {
 
               {redeemedProvisions.length > 0 ? (
                 <div className="stack-list">
-                  <div className="eyebrow">Historico resgatado</div>
+                  <div className="eyebrow">Histórico resgatado</div>
                   {redeemedProvisions.map((provision) => (
                     <article className="entity-card" key={provision.id}>
                       <div className="section-heading-row compact-row">
@@ -582,12 +556,12 @@ export function ProvisionsPage() {
           <div className="section-heading-row">
             <div>
               <div className="eyebrow">Timeline</div>
-              <h3>Distribuicao mensal planejada</h3>
+              <h3>Distribuição mensal planejada</h3>
             </div>
           </div>
 
           {projectedOccurrences.length === 0 ? (
-            <p>Nao ha ocorrencias futuras de provisao no horizonte atual.</p>
+            <p>Não há ocorrências futuras de provisão no horizonte atual.</p>
           ) : (
             <div className="sub-entity-list">
               {projectedOccurrences.map((occurrence) => (
@@ -601,7 +575,7 @@ export function ProvisionsPage() {
                   </div>
                   <div className="entity-actions compact-row">
                     <span className={getProvisionOccurrencePillClass(occurrence)}>
-                      {occurrence.kind === 'allocation' ? 'Reserva' : 'Liberacao'}
+                      {occurrence.kind === 'allocation' ? 'Reserva' : 'Liberação'}
                     </span>
                     <strong>{formatCurrencyInCents(occurrence.amountInCents)}</strong>
                   </div>
@@ -616,77 +590,14 @@ export function ProvisionsPage() {
         <article className="dashboard-card form-card">
           <div className="section-heading-row">
             <div>
-              <div className="eyebrow">Overrides</div>
-              <h3>Meses ajustados manualmente</h3>
-            </div>
-          </div>
-
-          {overrides.length === 0 ? (
-            <p>Sem overrides registrados. A media movel segue pura.</p>
-          ) : (
-            <div className="stack-list">
-              {overrides.map((override) => (
-                <article className="entity-card" key={override.id}>
-                  <div className="section-heading-row compact-row">
-                    <div>
-                      <strong>{override.description}</strong>
-                      <div className="helper-text">
-                        {override.accountName} • {formatDate(override.occurrenceDate)}
-                      </div>
-                    </div>
-                    <span className="status-pill status-pill-accent">Manual</span>
-                  </div>
-
-                  <div className="stats-grid stats-grid-inline">
-                    <div className="stat-item">
-                      <span>Valor travado</span>
-                      <strong>{formatCurrencyInCents(override.amountInCents)}</strong>
-                    </div>
-                    <div className="stat-item">
-                      <span>Criado em</span>
-                      <strong>{formatDate(override.createdAt)}</strong>
-                    </div>
-                    <div className="stat-item">
-                      <span>Atualizado em</span>
-                      <strong>{formatDate(override.updatedAt)}</strong>
-                    </div>
-                  </div>
-
-                  <div className="entity-actions">
-                    <button
-                      className="ghost-button"
-                      onClick={() => prepareOverride(override)}
-                      type="button"
-                    >
-                      Usar no formulario
-                    </button>
-                    <button
-                      className="ghost-button"
-                      onClick={() => {
-                        void removeOverride(override);
-                      }}
-                      type="button"
-                    >
-                      Remover override
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </article>
-
-        <article className="dashboard-card form-card">
-          <div className="section-heading-row">
-            <div>
-              <div className="eyebrow">Media movel</div>
-              <h3>Despesas variaveis projetadas</h3>
+              <div className="eyebrow">Média móvel</div>
+              <h3>Despesas variáveis projetadas</h3>
             </div>
           </div>
 
           {projectedVariableExpenses.length === 0 ? (
             <p>
-              Ainda nao existe historico suficiente para projetar series variaveis.
+              Ainda não existe histórico suficiente para projetar séries variáveis.
             </p>
           ) : (
             <div className="sub-entity-list">

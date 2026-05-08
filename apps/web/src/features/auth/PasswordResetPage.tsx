@@ -37,15 +37,11 @@ export function PasswordResetPage() {
       <section className="auth-panel">
         <div className="eyebrow">Reset seguro</div>
         <h1>Defina uma nova senha</h1>
-        <p>
-          Use o token recebido para trocar sua senha e voltar para a area
-          autenticada.
-        </p>
 
         <form className="auth-form" onSubmit={onSubmit}>
           <label>
             <span>Token</span>
-            <input {...register('token')} placeholder="Cole o token de redefinicao" />
+            <input {...register('token')} placeholder="Cole o token de redefinição" />
             <small>{errors.token?.message}</small>
           </label>
 
@@ -53,7 +49,7 @@ export function PasswordResetPage() {
             <span>Nova senha</span>
             <input
               {...register('password')}
-              placeholder="Minimo de 8 caracteres"
+              placeholder="Mínimo de 8 caracteres"
               type="password"
             />
             <small>{errors.password?.message}</small>

@@ -16,18 +16,11 @@ export function AppShell({ children }: PropsWithChildren) {
         </div>
 
         <div className="session-card">
-          <span>Usuario autenticado</span>
+          <span>Usuário autenticado</span>
           <strong>{session?.user.name}</strong>
-          <small>{session?.user.email}</small>
-          <small>
-            Sessao valida ate{' '}
-            {session?.expiresAt
-              ? new Date(session.expiresAt).toLocaleString('pt-BR')
-              : '--'}
-          </small>
         </div>
 
-        <nav className="shell-nav" aria-label="Navegacao privada">
+        <nav className="shell-nav" aria-label="Navegação privada">
           <NavLink
             className={({ isActive }) =>
               isActive ? 'shell-nav-link shell-nav-link-active' : 'shell-nav-link'
@@ -35,7 +28,7 @@ export function AppShell({ children }: PropsWithChildren) {
             end
             to="/app"
           >
-            Visao geral
+            Visão geral
           </NavLink>
           <NavLink
             className={({ isActive }) =>
@@ -51,7 +44,7 @@ export function AppShell({ children }: PropsWithChildren) {
             }
             to="/app/lancamentos"
           >
-            Lancamentos
+            Lançamentos
           </NavLink>
           <NavLink
             className={({ isActive }) =>
@@ -67,7 +60,7 @@ export function AppShell({ children }: PropsWithChildren) {
             }
             to="/app/cartoes"
           >
-            Cartoes
+            Cartões
           </NavLink>
           <NavLink
             className={({ isActive }) =>
@@ -83,7 +76,7 @@ export function AppShell({ children }: PropsWithChildren) {
             }
             to="/app/provisoes"
           >
-            Provisoes
+            Provisões
           </NavLink>
           <NavLink
             className={({ isActive }) =>
@@ -99,7 +92,7 @@ export function AppShell({ children }: PropsWithChildren) {
             }
             to="/app/acesso"
           >
-            Seguranca da conta
+            Segurança da conta
           </NavLink>
         </nav>
 
@@ -109,7 +102,7 @@ export function AppShell({ children }: PropsWithChildren) {
           onClick={() => logoutMutation.mutate()}
           type="button"
         >
-          Encerrar sessao
+          Encerrar sessão
         </button>
       </aside>
 

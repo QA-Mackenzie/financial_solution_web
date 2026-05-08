@@ -1853,7 +1853,7 @@ function mockAnalyticsShellFlow() {
         accountId: '11111111-1111-4111-8111-111111111111',
         accountName: 'Conta Principal Web',
         type: 'income' as const,
-        description: 'Salario maio',
+        description: 'Salário maio',
         category: 'Trabalho',
         tags: [
           {
@@ -2118,7 +2118,7 @@ describe('App', () => {
     });
   });
 
-  it('renderiza o dashboard quando existe sessao', async () => {
+  it('renderiza o dashboard quando existe sessão', async () => {
     window.history.pushState({}, '', '/app');
 
     mockAuthenticatedShellResponses();
@@ -2133,8 +2133,8 @@ describe('App', () => {
       ).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Margem de seguranca em centavos')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Recorrencias ativas' })).toBeInTheDocument();
+    expect(screen.getByText('Margem configurada')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Recorrências ativas' })).toBeInTheDocument();
   });
 
   it('gerencia tags e filtros na tela de analytics pela shell web', async () => {
@@ -2154,13 +2154,13 @@ describe('App', () => {
       .getByRole('heading', { name: 'Nova tag' })
       .closest('article');
     const filterSection = screen
-      .getByRole('heading', { name: 'Recorte analitico' })
+      .getByRole('heading', { name: 'Recorte analítico' })
       .closest('article');
     const recordsSection = screen
       .getByRole('heading', { name: 'Preview do fluxo financeiro filtrado' })
       .closest('article');
     const byEntitySection = screen
-      .getByRole('heading', { name: 'Impacto por conta e cartao' })
+      .getByRole('heading', { name: 'Impacto por conta e cartão' })
       .closest('article');
 
     expect(tagEditorSection).not.toBeNull();
@@ -2230,7 +2230,7 @@ describe('App', () => {
 
     await waitFor(() => {
       expect(
-        within(recordsSection as HTMLElement).getByText('Salario maio'),
+        within(recordsSection as HTMLElement).getByText('Salário maio'),
       ).toBeInTheDocument();
       expect(
         within(recordsSection as HTMLElement).getByText('Hotel cliente'),
@@ -2261,8 +2261,8 @@ describe('App', () => {
     fireEvent.change(screen.getByPlaceholderText('Conta principal'), {
       target: { value: 'Conta Principal Web' },
     });
-    fireEvent.change(screen.getByPlaceholderText('0'), {
-      target: { value: '100000' },
+    fireEvent.change(screen.getByLabelText('Saldo inicial em reais'), {
+      target: { value: '1000' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
 
@@ -2270,28 +2270,28 @@ describe('App', () => {
       expect(screen.getByText('Conta Principal Web')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('link', { name: 'Lancamentos' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Lançamentos' }));
 
     await waitFor(() => {
       expect(
-        screen.getByRole('heading', { name: 'Lancamentos manuais' }),
+        screen.getByRole('heading', { name: 'Lançamentos manuais' }),
       ).toBeInTheDocument();
     });
 
     const transactionsFormSection = screen
-      .getByRole('heading', { name: 'Novo lancamento' })
+      .getByRole('heading', { name: 'Novo lançamento' })
       .closest('article');
 
     expect(transactionsFormSection).not.toBeNull();
 
-    fireEvent.change(within(transactionsFormSection as HTMLElement).getByPlaceholderText('Ex.: salario'), {
+    fireEvent.change(within(transactionsFormSection as HTMLElement).getByPlaceholderText('Ex.: salário'), {
       target: { value: 'Recebimento salarial' },
     });
     fireEvent.change(within(transactionsFormSection as HTMLElement).getByLabelText('Categoria'), {
       target: { value: 'Trabalho' },
     });
-    fireEvent.change(within(transactionsFormSection as HTMLElement).getByLabelText('Valor em centavos'), {
-      target: { value: '200000' },
+    fireEvent.change(within(transactionsFormSection as HTMLElement).getByLabelText('Valor em reais'), {
+      target: { value: '2000' },
     });
     fireEvent.change(within(transactionsFormSection as HTMLElement).getByLabelText('Data'), {
       target: { value: '2026-05-05' },
@@ -2301,7 +2301,7 @@ describe('App', () => {
     });
     fireEvent.click(
       within(transactionsFormSection as HTMLElement).getByRole('button', {
-        name: 'Criar lancamento',
+        name: 'Criar lançamento',
       }),
     );
 
@@ -2309,14 +2309,14 @@ describe('App', () => {
       expect(screen.getByText('Recebimento salarial')).toBeInTheDocument();
     });
 
-    fireEvent.change(within(transactionsFormSection as HTMLElement).getByLabelText('Descricao'), {
+    fireEvent.change(within(transactionsFormSection as HTMLElement).getByLabelText('Descrição'), {
       target: { value: 'Pagamento do aluguel' },
     });
     fireEvent.change(within(transactionsFormSection as HTMLElement).getByLabelText('Categoria'), {
       target: { value: 'Casa' },
     });
-    fireEvent.change(within(transactionsFormSection as HTMLElement).getByLabelText('Valor em centavos'), {
-      target: { value: '50000' },
+    fireEvent.change(within(transactionsFormSection as HTMLElement).getByLabelText('Valor em reais'), {
+      target: { value: '500' },
     });
     fireEvent.change(within(transactionsFormSection as HTMLElement).getByLabelText('Tipo'), {
       target: { value: 'expense' },
@@ -2326,7 +2326,7 @@ describe('App', () => {
     });
     fireEvent.click(
       within(transactionsFormSection as HTMLElement).getByRole('button', {
-        name: 'Criar lancamento',
+        name: 'Criar lançamento',
       }),
     );
 
@@ -2334,11 +2334,11 @@ describe('App', () => {
       expect(screen.getByText('Pagamento do aluguel')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('link', { name: 'Visao geral' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Visão geral' }));
 
     await waitFor(() => {
       const saldoCard = screen
-        .getByRole('heading', { name: 'Fechamento do mes atual' })
+        .getByRole('heading', { name: 'Fechamento do mês atual' })
         .closest('article');
       const riscoCard = screen
         .getByRole('heading', { name: 'Principal risco do horizonte' })
@@ -2370,8 +2370,8 @@ describe('App', () => {
     fireEvent.change(screen.getByPlaceholderText('Conta principal'), {
       target: { value: 'Conta Contratos Web' },
     });
-    fireEvent.change(screen.getByPlaceholderText('0'), {
-      target: { value: '300000' },
+    fireEvent.change(screen.getByLabelText('Saldo inicial em reais'), {
+      target: { value: '3000' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
 
@@ -2391,15 +2391,15 @@ describe('App', () => {
       target: { value: 'Academia premium' },
     });
     fireEvent.change(screen.getByPlaceholderText('Ex.: moradia'), {
-      target: { value: 'Saude' },
+      target: { value: 'Saúde' },
     });
-    fireEvent.change(screen.getByLabelText('Valor em centavos'), {
-      target: { value: '9900' },
+    fireEvent.change(screen.getByLabelText('Valor em reais'), {
+      target: { value: '99' },
     });
     fireEvent.change(screen.getByLabelText('Dia de vencimento'), {
       target: { value: '20' },
     });
-    fireEvent.change(screen.getByLabelText('Inicio da recorrencia'), {
+    fireEvent.change(screen.getByLabelText('Início da recorrência'), {
       target: { value: '2026-05-01' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Criar contrato' }));
@@ -2409,10 +2409,10 @@ describe('App', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Novo reajuste' }));
-    fireEvent.change(screen.getByLabelText('Novo valor em centavos'), {
-      target: { value: '13500' },
+    fireEvent.change(screen.getByLabelText('Novo valor em reais'), {
+      target: { value: '135' },
     });
-    fireEvent.change(screen.getByLabelText('Inicio do reajuste'), {
+    fireEvent.change(screen.getByLabelText('Início do reajuste'), {
       target: { value: '2026-06-01' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Salvar reajuste' }));
@@ -2441,7 +2441,7 @@ describe('App', () => {
     ).toBeInTheDocument();
   });
 
-  it('gerencia cartoes e projeta a fatura no mes de vencimento pela shell web', async () => {
+  it('gerencia cartões e projeta a fatura no mês de vencimento pela shell web', async () => {
     window.history.pushState({}, '', '/app/contas');
 
     mockCreditCardShellFlow();
@@ -2457,8 +2457,8 @@ describe('App', () => {
     fireEvent.change(screen.getByPlaceholderText('Conta principal'), {
       target: { value: 'Conta Cartao Web' },
     });
-    fireEvent.change(screen.getByPlaceholderText('0'), {
-      target: { value: '500000' },
+    fireEvent.change(screen.getByLabelText('Saldo inicial em reais'), {
+      target: { value: '5000' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
 
@@ -2466,12 +2466,12 @@ describe('App', () => {
       expect(screen.getByText('Conta Cartao Web')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('link', { name: 'Cartoes' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Cartões' }));
 
     await waitFor(() => {
       expect(
         screen.getByRole('heading', {
-          name: 'Cartoes de credito e ciclo de fatura',
+          name: 'Cartões de crédito e ciclo de fatura',
         }),
       ).toBeInTheDocument();
     });
@@ -2479,8 +2479,8 @@ describe('App', () => {
     fireEvent.change(screen.getByPlaceholderText('Ex.: Visa Platinum'), {
       target: { value: 'Visa Corporativo' },
     });
-    fireEvent.change(screen.getByLabelText('Limite em centavos'), {
-      target: { value: '300000' },
+    fireEvent.change(screen.getByLabelText('Limite em reais'), {
+      target: { value: '3000' },
     });
     fireEvent.change(screen.getByLabelText('Fechamento'), {
       target: { value: '25' },
@@ -2488,10 +2488,10 @@ describe('App', () => {
     fireEvent.change(screen.getByLabelText('Vencimento'), {
       target: { value: '8' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Criar cartao' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Criar cartão' }));
 
     const cardsSection = screen
-      .getByRole('heading', { name: 'Visao atual de limite, ciclo e fatura' })
+      .getByRole('heading', { name: 'Visão atual de limite, ciclo e fatura' })
       .closest('article');
 
     expect(cardsSection).not.toBeNull();
@@ -2502,14 +2502,14 @@ describe('App', () => {
       ).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Editar cartao' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Editar cartão' }));
     fireEvent.change(screen.getByPlaceholderText('Ex.: Visa Platinum'), {
       target: { value: 'Visa Corporativo Black' },
     });
-    fireEvent.change(screen.getByLabelText('Limite em centavos'), {
-      target: { value: '450000' },
+    fireEvent.change(screen.getByLabelText('Limite em reais'), {
+      target: { value: '4500' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Atualizar cartao' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Atualizar cartão' }));
 
     await waitFor(() => {
       expect(
@@ -2518,7 +2518,7 @@ describe('App', () => {
     });
 
     const purchaseFormSection = screen
-      .getByRole('heading', { name: 'Nova compra no credito' })
+      .getByRole('heading', { name: 'Nova compra no crédito' })
       .closest('article');
 
     expect(purchaseFormSection).not.toBeNull();
@@ -2529,8 +2529,8 @@ describe('App', () => {
     fireEvent.change(within(purchaseFormSection as HTMLElement).getByLabelText('Categoria'), {
       target: { value: 'Tecnologia' },
     });
-    fireEvent.change(within(purchaseFormSection as HTMLElement).getByLabelText('Valor em centavos'), {
-      target: { value: '50000' },
+    fireEvent.change(within(purchaseFormSection as HTMLElement).getByLabelText('Valor em reais'), {
+      target: { value: '500' },
     });
     fireEvent.change(within(purchaseFormSection as HTMLElement).getByLabelText('Data da compra'), {
       target: { value: '2026-05-20' },
@@ -2542,7 +2542,7 @@ describe('App', () => {
     );
 
     const purchasesSection = screen
-      .getByRole('heading', { name: 'Compras no credito' })
+      .getByRole('heading', { name: 'Compras no crédito' })
       .closest('article');
 
     expect(purchasesSection).not.toBeNull();
@@ -2557,8 +2557,8 @@ describe('App', () => {
     fireEvent.change(within(purchaseFormSection as HTMLElement).getByPlaceholderText('Ex.: notebook'), {
       target: { value: 'Notebook trabalho ajustado' },
     });
-    fireEvent.change(within(purchaseFormSection as HTMLElement).getByLabelText('Valor em centavos'), {
-      target: { value: '60000' },
+    fireEvent.change(within(purchaseFormSection as HTMLElement).getByLabelText('Valor em reais'), {
+      target: { value: '600' },
     });
     fireEvent.click(
       within(purchaseFormSection as HTMLElement).getByRole('button', {
@@ -2580,8 +2580,8 @@ describe('App', () => {
     fireEvent.change(within(purchaseFormSection as HTMLElement).getByLabelText('Categoria'), {
       target: { value: 'Viagem' },
     });
-    fireEvent.change(within(purchaseFormSection as HTMLElement).getByLabelText('Valor em centavos'), {
-      target: { value: '25000' },
+    fireEvent.change(within(purchaseFormSection as HTMLElement).getByLabelText('Valor em reais'), {
+      target: { value: '250' },
     });
     fireEvent.change(within(purchaseFormSection as HTMLElement).getByLabelText('Data da compra'), {
       target: { value: '2026-05-26' },
@@ -2593,7 +2593,7 @@ describe('App', () => {
     );
 
     const projectedInvoicesSection = screen
-      .getByRole('heading', { name: 'Proximos vencimentos' })
+      .getByRole('heading', { name: 'Próximos vencimentos' })
       .closest('article');
 
     expect(projectedInvoicesSection).not.toBeNull();
@@ -2610,7 +2610,7 @@ describe('App', () => {
       ).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('link', { name: 'Visao geral' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Visão geral' }));
 
     await waitFor(() => {
       expect(
@@ -2634,9 +2634,9 @@ describe('App', () => {
     expect(juneCard).not.toBeNull();
     expect(julyCard).not.toBeNull();
 
-    const mayExpense = within(mayCard as HTMLElement).getByText('Saidas').closest('div');
-    const juneExpense = within(juneCard as HTMLElement).getByText('Saidas').closest('div');
-    const julyExpense = within(julyCard as HTMLElement).getByText('Saidas').closest('div');
+    const mayExpense = within(mayCard as HTMLElement).getByText('Saídas').closest('div');
+    const juneExpense = within(juneCard as HTMLElement).getByText('Saídas').closest('div');
+    const julyExpense = within(julyCard as HTMLElement).getByText('Saídas').closest('div');
 
     expect(mayExpense).not.toBeNull();
     expect(juneExpense).not.toBeNull();
@@ -2663,8 +2663,8 @@ describe('App', () => {
     fireEvent.change(screen.getByPlaceholderText('Conta principal'), {
       target: { value: 'Conta Parcelamentos Web' },
     });
-    fireEvent.change(screen.getByPlaceholderText('0'), {
-      target: { value: '500000' },
+    fireEvent.change(screen.getByLabelText('Saldo inicial em reais'), {
+      target: { value: '5000' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
 
@@ -2672,12 +2672,12 @@ describe('App', () => {
       expect(screen.getByText('Conta Parcelamentos Web')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('link', { name: 'Cartoes' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Cartões' }));
 
     await waitFor(() => {
       expect(
         screen.getByRole('heading', {
-          name: 'Cartoes de credito e ciclo de fatura',
+          name: 'Cartões de crédito e ciclo de fatura',
         }),
       ).toBeInTheDocument();
     });
@@ -2685,8 +2685,8 @@ describe('App', () => {
     fireEvent.change(screen.getByPlaceholderText('Ex.: Visa Platinum'), {
       target: { value: 'Visa Parcelado Web' },
     });
-    fireEvent.change(screen.getByLabelText('Limite em centavos'), {
-      target: { value: '400000' },
+    fireEvent.change(screen.getByLabelText('Limite em reais'), {
+      target: { value: '4000' },
     });
     fireEvent.change(screen.getByLabelText('Fechamento'), {
       target: { value: '25' },
@@ -2694,10 +2694,10 @@ describe('App', () => {
     fireEvent.change(screen.getByLabelText('Vencimento'), {
       target: { value: '8' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Criar cartao' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Criar cartão' }));
 
     const cardsSection = screen
-      .getByRole('heading', { name: 'Visao atual de limite, ciclo e fatura' })
+      .getByRole('heading', { name: 'Visão atual de limite, ciclo e fatura' })
       .closest('article');
 
     expect(cardsSection).not.toBeNull();
@@ -2713,21 +2713,21 @@ describe('App', () => {
     await waitFor(() => {
       expect(
         screen.getByRole('heading', {
-          name: 'Parcelamentos, cronograma e antecipacoes',
+          name: 'Parcelamentos, cronograma e antecipações',
         }),
       ).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText('Descricao do parcelamento'), {
+    fireEvent.change(screen.getByLabelText('Descrição do parcelamento'), {
       target: { value: 'Notebook parcelado' },
     });
-    fireEvent.change(screen.getByLabelText('Valor total em centavos'), {
-      target: { value: '120000' },
+    fireEvent.change(screen.getByLabelText('Valor total em reais'), {
+      target: { value: '1200' },
     });
     fireEvent.change(screen.getByLabelText('Quantidade de parcelas'), {
       target: { value: '4' },
     });
-    fireEvent.change(screen.getByLabelText('Primeira ocorrencia'), {
+    fireEvent.change(screen.getByLabelText('Primeira ocorrência'), {
       target: { value: '2026-05-10' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Criar parcelamento' }));
@@ -2744,7 +2744,7 @@ describe('App', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Editar parcelamento' }));
-    fireEvent.change(screen.getByLabelText('Descricao do parcelamento'), {
+    fireEvent.change(screen.getByLabelText('Descrição do parcelamento'), {
       target: { value: 'Notebook parcelado ajustado' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Atualizar parcelamento' }));
@@ -2760,7 +2760,7 @@ describe('App', () => {
       ).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText('Data da antecipacao'), {
+    fireEvent.change(screen.getByLabelText('Data da antecipação'), {
       target: { value: '2026-05-05' },
     });
     fireEvent.change(screen.getByLabelText('Quantidade de parcelas afetadas'), {
@@ -2776,16 +2776,16 @@ describe('App', () => {
     fireEvent.change(screen.getByLabelText('Origem do parcelamento'), {
       target: { value: 'creditCard' },
     });
-    fireEvent.change(screen.getByLabelText('Descricao do parcelamento'), {
+    fireEvent.change(screen.getByLabelText('Descrição do parcelamento'), {
       target: { value: 'Curso parcelado' },
     });
-    fireEvent.change(screen.getByLabelText('Valor total em centavos'), {
-      target: { value: '90000' },
+    fireEvent.change(screen.getByLabelText('Valor total em reais'), {
+      target: { value: '900' },
     });
     fireEvent.change(screen.getByLabelText('Quantidade de parcelas'), {
       target: { value: '3' },
     });
-    fireEvent.change(screen.getByLabelText('Primeira ocorrencia'), {
+    fireEvent.change(screen.getByLabelText('Primeira ocorrência'), {
       target: { value: '2026-05-20' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Criar parcelamento' }));
@@ -2801,7 +2801,7 @@ describe('App', () => {
       ).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText('Data da antecipacao'), {
+    fireEvent.change(screen.getByLabelText('Data da antecipação'), {
       target: { value: '2026-05-01' },
     });
     fireEvent.change(screen.getByLabelText('Quantidade de parcelas afetadas'), {
@@ -2814,19 +2814,19 @@ describe('App', () => {
       expect(screen.getByText('Compra projetada 2/3')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('link', { name: 'Cartoes' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Cartões' }));
 
     await waitFor(() => {
       expect(
-        screen.getByRole('heading', { name: 'Compras no credito' }),
+        screen.getByRole('heading', { name: 'Compras no crédito' }),
       ).toBeInTheDocument();
     });
 
     const purchasesSection = screen
-      .getByRole('heading', { name: 'Compras no credito' })
+      .getByRole('heading', { name: 'Compras no crédito' })
       .closest('article');
     const projectedInvoicesSection = screen
-      .getByRole('heading', { name: 'Proximos vencimentos' })
+      .getByRole('heading', { name: 'Próximos vencimentos' })
       .closest('article');
 
     expect(purchasesSection).not.toBeNull();
@@ -2851,7 +2851,7 @@ describe('App', () => {
       ).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('link', { name: 'Visao geral' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Visão geral' }));
 
     await waitFor(() => {
       expect(
@@ -2878,10 +2878,10 @@ describe('App', () => {
     expect(julyCard).not.toBeNull();
     expect(augustCard).not.toBeNull();
 
-    const mayExpense = within(mayCard as HTMLElement).getByText('Saidas').closest('div');
-    const juneExpense = within(juneCard as HTMLElement).getByText('Saidas').closest('div');
-    const julyExpense = within(julyCard as HTMLElement).getByText('Saidas').closest('div');
-    const augustExpense = within(augustCard as HTMLElement).getByText('Saidas').closest('div');
+    const mayExpense = within(mayCard as HTMLElement).getByText('Saídas').closest('div');
+    const juneExpense = within(juneCard as HTMLElement).getByText('Saídas').closest('div');
+    const julyExpense = within(julyCard as HTMLElement).getByText('Saídas').closest('div');
+    const augustExpense = within(augustCard as HTMLElement).getByText('Saídas').closest('div');
 
     expect(mayExpense).not.toBeNull();
     expect(juneExpense).not.toBeNull();
@@ -2894,7 +2894,7 @@ describe('App', () => {
     expect(within(augustExpense as HTMLElement).getByText(/R\$\s*600,00/)).toBeInTheDocument();
   });
 
-  it('gerencia provisoes e overrides manuais pela shell web', async () => {
+  it('gerencia provisões e overrides manuais pela shell web', async () => {
     window.history.pushState({}, '', '/app/provisoes');
 
     mockProvisionShellFlow();
@@ -2904,7 +2904,7 @@ describe('App', () => {
     await waitFor(() => {
       expect(
         screen.getByRole('heading', {
-          name: 'Provisoes e despesas variaveis futuras',
+          name: 'Provisões e despesas variáveis futuras',
         }),
       ).toBeInTheDocument();
       expect(screen.getByLabelText('Conta de reserva')).toBeInTheDocument();
@@ -2919,23 +2919,23 @@ describe('App', () => {
     fireEvent.change(screen.getByPlaceholderText('Ex.: Casa'), {
       target: { value: 'Casa' },
     });
-    fireEvent.change(screen.getByLabelText('Meta em centavos'), {
-      target: { value: '90000' },
+    fireEvent.change(screen.getByLabelText('Meta em reais'), {
+      target: { value: '900' },
     });
-    fireEvent.change(screen.getByLabelText('Inicio da reserva'), {
+    fireEvent.change(screen.getByLabelText('Início da reserva'), {
       target: { value: '2026-05-05' },
     });
     fireEvent.change(screen.getByLabelText('Data de resgate'), {
       target: { value: '2026-08-10' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Criar provisao' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Criar provisão' }));
 
     await waitFor(() => {
       const provisionsSection = screen
-        .getByRole('heading', { name: 'Provisoes cadastradas' })
+        .getByRole('heading', { name: 'Provisões cadastradas' })
         .closest('article');
       const timelineSection = screen
-        .getByRole('heading', { name: 'Distribuicao mensal planejada' })
+        .getByRole('heading', { name: 'Distribuição mensal planejada' })
         .closest('article');
 
       expect(provisionsSection).not.toBeNull();
@@ -2954,20 +2954,19 @@ describe('App', () => {
         target: { value: 'Supermercado' },
       },
     );
-    fireEvent.change(screen.getByLabelText('Mes futuro'), {
+    fireEvent.change(screen.getByLabelText('Mês futuro'), {
       target: { value: '2026-06-10' },
     });
-    fireEvent.change(screen.getByLabelText('Novo valor em centavos'), {
-      target: { value: '18500' },
+    fireEvent.change(screen.getByLabelText('Novo valor em reais'), {
+      target: { value: '185' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Salvar override' }));
 
     await waitFor(() => {
       expect(screen.getAllByText('Override manual').length).toBeGreaterThan(0);
-      expect(screen.getByText('Meses ajustados manualmente')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('link', { name: 'Visao geral' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Visão geral' }));
 
     await waitFor(() => {
       expect(
@@ -2976,10 +2975,7 @@ describe('App', () => {
         }),
       ).toBeInTheDocument();
       expect(
-        screen.getByRole('heading', { name: 'Blindagem por provisao' }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole('heading', { name: 'Despesas variaveis futuras' }),
+        screen.getByRole('heading', { name: 'Blindagem por provisão' }),
       ).toBeInTheDocument();
     });
 
@@ -2994,36 +2990,36 @@ describe('App', () => {
     expect(mayCard).not.toBeNull();
     expect(juneCard).not.toBeNull();
     expect(
-      within(mayCard as HTMLElement).getByText('Reserva do mes'),
+      within(mayCard as HTMLElement).getByText('Reserva do mês'),
     ).toBeInTheDocument();
     expect(
       within(juneCard as HTMLElement).getByText('Overrides manuais'),
     ).toBeInTheDocument();
-    const juneExpense = within(juneCard as HTMLElement).getByText('Saidas').closest('div');
+    const juneExpense = within(juneCard as HTMLElement).getByText('Saídas').closest('div');
 
     expect(juneExpense).not.toBeNull();
     expect(
       within(juneExpense as HTMLElement).getByText(/R\$\s*185,00/),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('link', { name: 'Provisoes' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Provisões' }));
 
     await waitFor(() => {
       expect(
         screen.getByRole('heading', {
-          name: 'Provisoes e despesas variaveis futuras',
+          name: 'Provisões e despesas variáveis futuras',
         }),
       ).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Editar provisao' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Editar provisão' }));
     fireEvent.change(
       screen.getByPlaceholderText('Ex.: IPVA, seguro anual, viagem'),
       {
         target: { value: 'Seguro anual familiar' },
       },
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Atualizar provisao' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Atualizar provisão' }));
 
     await waitFor(() => {
       expect(screen.getAllByText('Seguro anual familiar').length).toBeGreaterThan(0);
@@ -3033,20 +3029,11 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Registrar resgate' }));
 
     await waitFor(() => {
-      expect(screen.getByText('Historico resgatado')).toBeInTheDocument();
+      expect(screen.getByText('Histórico resgatado')).toBeInTheDocument();
       expect(screen.getByText('Resgatada')).toBeInTheDocument();
       expect(
-        screen.getByText('Nao ha ocorrencias futuras de provisao no horizonte atual.'),
+        screen.getByText('Não há ocorrências futuras de provisão no horizonte atual.'),
       ).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Remover override' }));
-
-    await waitFor(() => {
-      expect(
-        screen.getByText('Sem overrides registrados. A media movel segue pura.'),
-      ).toBeInTheDocument();
-      expect(screen.getAllByText('Media movel').length).toBeGreaterThan(0);
     });
   });
 
@@ -3062,7 +3049,7 @@ describe('App', () => {
     await waitFor(() => {
       expect(
         screen.getByRole('checkbox', {
-          name: /li e aceito a politica de privacidade/i,
+          name: /li e aceito a política de privacidade/i,
         }),
       ).toBeInTheDocument();
     });
@@ -3084,7 +3071,7 @@ describe('App', () => {
     });
   });
 
-  it('mostra a tela de redefinicao de senha para visitantes', async () => {
+  it('mostra a tela de redefinição de senha para visitantes', async () => {
     window.history.pushState({}, '', '/redefinir-senha?token=preview-token');
 
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(

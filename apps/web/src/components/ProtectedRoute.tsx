@@ -7,7 +7,7 @@ export function ProtectedRoute({ children }: PropsWithChildren) {
   const { data: session, isLoading } = useSessionQuery();
 
   if (isLoading) {
-    return <div className="screen-message">Carregando sessao...</div>;
+    return <div className="screen-message">Carregando sessão...</div>;
   }
 
   if (!session) {
