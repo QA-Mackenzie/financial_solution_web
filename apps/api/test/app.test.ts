@@ -141,6 +141,17 @@ describe('api bootstrap', () => {
     expect(response.headers['set-cookie']).toContain('economy_cash_session=;');
   });
 
+  it('encerra logout sem cookie e ainda devolve expiracao do cookie', async () => {
+    const response = await authEnvironment!.app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/logout',
+    });
+
+    expect(response.statusCode).toBe(204);
+    expect(response.headers['set-cookie']).toContain('economy_cash_session=;');
+    expect(response.headers['set-cookie']).toContain('Max-Age=0');
+  });
+
   it('serializa erros com code e correlation id', async () => {
     const response = await authEnvironment!.app.inject({
       method: 'POST',
