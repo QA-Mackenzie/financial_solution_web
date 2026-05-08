@@ -31,8 +31,8 @@ const sessionCookieOptions = {
   partitioned: env.NODE_ENV === 'production',
 };
 
-function clearSessionCookie(reply: { clearCookie: (name: string, options: typeof sessionCookieOptions) => void; }) {
-  reply.clearCookie(env.SESSION_COOKIE_NAME, sessionCookieOptions);
+function clearSessionCookie(reply: { header: (name: string, value: string) => void; }) {
+  reply.header('set-cookie', buildExpiredSessionCookieHeader());
 }
 
 function getAuthContext(request: {
@@ -55,6 +55,27 @@ function buildSessionCookieOptions(maxAge: number) {
     ...sessionCookieOptions,
     maxAge,
   };
+}
+
+function buildExpiredSessionCookieHeader() {
+  const parts = [
+    `${env.SESSION_COOKIE_NAME}=`,
+    'Max-Age=0',
+    'Path=/',
+    'Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+    'HttpOnly',
+    `SameSite=${sessionCookieOptions.sameSite === 'none' ? 'None' : 'Lax'}`,
+  ];
+
+  if (sessionCookieOptions.secure) {
+    parts.push('Secure');
+  }
+
+  if (sessionCookieOptions.partitioned) {
+    parts.push('Partitioned');
+  }
+
+  return parts.join('; ');
 }
 
 export function authRoutes(authService: AuthService): FastifyPluginAsync {
