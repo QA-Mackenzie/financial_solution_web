@@ -66,12 +66,15 @@ const sessionPersistenceErrorMessage =
   'Conta criada, mas o navegador nao conseguiu manter sua sessao. Permita cookies entre o app e a API e tente entrar novamente.';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers);
+
+  if (init?.body !== undefined && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
   const response = await fetch(`${apiBaseUrl}${path}`, {
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...init?.headers,
-    },
+    headers,
     ...init,
   });
 

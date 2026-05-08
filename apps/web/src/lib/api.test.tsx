@@ -16,6 +16,24 @@ afterEach(() => {
 });
 
 describe('authApi', () => {
+  it('nao envia content-type json no logout sem body', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(null, {
+        status: 204,
+      }),
+    );
+
+    await authApi.logout();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const [, requestInit] = fetchMock.mock.calls[0] ?? [];
+    const headers = new Headers((requestInit as RequestInit | undefined)?.headers);
+
+    expect((requestInit as RequestInit | undefined)?.method).toBe('POST');
+    expect(headers.get('Content-Type')).toBeNull();
+  });
+
   it('mostra erro claro quando o cadastro cria a conta mas a sessao nao persiste', async () => {
     vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(
