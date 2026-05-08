@@ -20,8 +20,7 @@ previews:
 
 databases:
   - name: solucao-financeira-web-db
-    plan: basic-256mb
-    region: virginia
+    plan: free
     postgresMajorVersion: "16"
     databaseName: shf_web
     user: shf_web
@@ -31,7 +30,6 @@ services:
     name: solucao-financeira-web-api
     runtime: node
     plan: free
-    region: virginia
     numInstances: 1
     buildCommand: >-
       npm ci &&
