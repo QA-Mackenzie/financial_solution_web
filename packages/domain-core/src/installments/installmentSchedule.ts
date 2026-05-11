@@ -135,27 +135,39 @@ export const buildInstallmentOccurrenceListItems = (
         } satisfies InstallmentOccurrenceListItem;
         },
       );
+      let nextFutureOccurrenceIndex = 0;
 
       for (const operation of planOperations) {
         if (operation.type !== 'anticipation') {
           continue;
         }
 
-        const targetOccurrences = occurrences
-          .filter((occurrence) => occurrence.occurrenceDate > operation.operationDate)
-          .sort(
-            (left, right) =>
-              left.occurrenceDate.localeCompare(right.occurrenceDate) ||
-              left.installmentNumber - right.installmentNumber ||
-              left.id.localeCompare(right.id),
-          )
-          .slice(0, operation.affectedInstallmentCount);
+        while (
+          nextFutureOccurrenceIndex < occurrences.length &&
+          occurrences[nextFutureOccurrenceIndex]!.occurrenceDate <=
+            operation.operationDate
+        ) {
+          nextFutureOccurrenceIndex += 1;
+        }
 
-        for (const occurrence of targetOccurrences) {
+        const targetEndIndex = Math.min(
+          nextFutureOccurrenceIndex + operation.affectedInstallmentCount,
+          occurrences.length,
+        );
+
+        for (
+          let occurrenceIndex = nextFutureOccurrenceIndex;
+          occurrenceIndex < targetEndIndex;
+          occurrenceIndex += 1
+        ) {
+          const occurrence = occurrences[occurrenceIndex]!;
+
           occurrence.occurrenceDate = operation.operationDate;
           occurrence.anticipatedOperationId = operation.id;
           occurrence.updatedAt = operation.createdAt;
         }
+
+        nextFutureOccurrenceIndex = targetEndIndex;
       }
 
       return occurrences;

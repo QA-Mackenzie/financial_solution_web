@@ -145,6 +145,8 @@ select {
 }
 
 .auth-form input,
+.auth-form select,
+.auth-form textarea,
 .finance-form input,
 .finance-form select,
 .filter-grid input,
@@ -160,6 +162,8 @@ select {
 }
 
 .auth-form input:focus,
+.auth-form select:focus,
+.auth-form textarea:focus,
 .finance-form input:focus,
 .finance-form select:focus,
 .filter-grid input:focus,
@@ -169,6 +173,7 @@ select {
 }
 
 .auth-form input::placeholder,
+.auth-form textarea::placeholder,
 .finance-form input::placeholder {
   color: rgba(245, 241, 232, 0.48);
 }

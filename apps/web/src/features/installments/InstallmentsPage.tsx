@@ -61,6 +61,43 @@ function getOccurrenceBadge(occurrence: InstallmentOccurrenceListItem) {
     : `Mantida em ${formatDate(occurrence.occurrenceDate)}`;
 }
 
+function buildSelectedPlanState(
+  selectedPlanId: string,
+  plans: InstallmentPlanListItem[],
+  occurrences: InstallmentOccurrenceListItem[],
+  operations: InstallmentOperation[],
+  projectedCreditCardPurchases: ProjectedInstallmentCreditCardPurchase[],
+) {
+  const planIds = new Set<string>();
+  let selectedPlan: InstallmentPlanListItem | null = null;
+
+  for (const plan of plans) {
+    planIds.add(plan.id);
+
+    if (plan.id === selectedPlanId) {
+      selectedPlan = plan;
+    }
+  }
+
+  const selectedPlanOccurrences = occurrences.filter(
+    (occurrence) => occurrence.planId === selectedPlanId,
+  );
+  const selectedPlanOperations = operations.filter(
+    (operation) => operation.planId === selectedPlanId,
+  );
+  const selectedPlanProjectedCardPurchases = projectedCreditCardPurchases.filter(
+    (purchase) => purchase.planId === selectedPlanId,
+  );
+
+  return {
+    planIds,
+    selectedPlan,
+    selectedPlanOccurrences,
+    selectedPlanOperations,
+    selectedPlanProjectedCardPurchases,
+  };
+}
+
 export function InstallmentsPage() {
   const [editingPlan, setEditingPlan] = useState<InstallmentPlanListItem | null>(null);
   const [selectedPlanId, setSelectedPlanId] = useState('');
@@ -119,12 +156,30 @@ export function InstallmentsPage() {
     }
   }, [firstPlanId, selectedPlanId, setAnticipationValue]);
 
+  const {
+    planIds,
+    selectedPlan,
+    selectedPlanOccurrences,
+    selectedPlanOperations,
+    selectedPlanProjectedCardPurchases,
+  } = useMemo(
+    () =>
+      buildSelectedPlanState(
+        selectedPlanId,
+        plans,
+        occurrences,
+        operations,
+        projectedCreditCardPurchases,
+      ),
+    [occurrences, operations, plans, projectedCreditCardPurchases, selectedPlanId],
+  );
+
   useEffect(() => {
-    if (selectedPlanId && !plans.some((plan) => plan.id === selectedPlanId)) {
+    if (selectedPlanId && !planIds.has(selectedPlanId)) {
       setSelectedPlanId(firstPlanId);
       setAnticipationValue('planId', firstPlanId);
     }
-  }, [firstPlanId, plans, selectedPlanId, setAnticipationValue]);
+  }, [firstPlanId, planIds, selectedPlanId, setAnticipationValue]);
 
   useEffect(() => {
     if (selectedSourceType === 'account') {
@@ -149,24 +204,6 @@ export function InstallmentsPage() {
     selectedSourceType,
     setPlanValue,
   ]);
-
-  const selectedPlan = useMemo(
-    () => plans.find((plan) => plan.id === selectedPlanId) ?? null,
-    [plans, selectedPlanId],
-  );
-  const selectedPlanOccurrences = useMemo(
-    () => occurrences.filter((occurrence) => occurrence.planId === selectedPlanId),
-    [occurrences, selectedPlanId],
-  );
-  const selectedPlanOperations = useMemo(
-    () => operations.filter((operation) => operation.planId === selectedPlanId),
-    [operations, selectedPlanId],
-  );
-  const selectedPlanProjectedCardPurchases = useMemo(
-    () =>
-      projectedCreditCardPurchases.filter((purchase) => purchase.planId === selectedPlanId),
-    [projectedCreditCardPurchases, selectedPlanId],
-  );
 
   const onSubmitPlan = handlePlanSubmit(async (values) => {
     const savedPlan = editingPlan

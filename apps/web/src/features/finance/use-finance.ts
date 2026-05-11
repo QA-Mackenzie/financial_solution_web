@@ -44,20 +44,88 @@ export const variableExpenseSnapshotQueryKey = [
   'snapshot',
 ];
 
-async function invalidateFinancialQueries(queryClient: ReturnType<typeof useQueryClient>) {
-  await Promise.all([
-    queryClient.invalidateQueries({ queryKey: accountsSnapshotQueryKey }),
-    queryClient.invalidateQueries({ queryKey: creditCardsSnapshotQueryKey }),
-    queryClient.invalidateQueries({ queryKey: contractsSnapshotQueryKey }),
-    queryClient.invalidateQueries({ queryKey: financialAnalyticsQueryKey }),
-    queryClient.invalidateQueries({ queryKey: financialRecordsQueryKey }),
-    queryClient.invalidateQueries({ queryKey: horizonSnapshotQueryKey }),
-    queryClient.invalidateQueries({ queryKey: installmentsSnapshotQueryKey }),
-    queryClient.invalidateQueries({ queryKey: provisionsSnapshotQueryKey }),
-    queryClient.invalidateQueries({ queryKey: tagsSnapshotQueryKey }),
-    queryClient.invalidateQueries({ queryKey: transactionsSnapshotQueryKey }),
-    queryClient.invalidateQueries({ queryKey: variableExpenseSnapshotQueryKey }),
-  ]);
+const accountMutationQueryKeys = [
+  accountsSnapshotQueryKey,
+  creditCardsSnapshotQueryKey,
+  contractsSnapshotQueryKey,
+  financialAnalyticsQueryKey,
+  financialRecordsQueryKey,
+  horizonSnapshotQueryKey,
+  installmentsSnapshotQueryKey,
+  provisionsSnapshotQueryKey,
+  transactionsSnapshotQueryKey,
+  variableExpenseSnapshotQueryKey,
+];
+
+const transactionMutationQueryKeys = [
+  accountsSnapshotQueryKey,
+  financialAnalyticsQueryKey,
+  financialRecordsQueryKey,
+  horizonSnapshotQueryKey,
+  tagsSnapshotQueryKey,
+  transactionsSnapshotQueryKey,
+  variableExpenseSnapshotQueryKey,
+];
+
+const tagMutationQueryKeys = [
+  creditCardsSnapshotQueryKey,
+  financialAnalyticsQueryKey,
+  financialRecordsQueryKey,
+  tagsSnapshotQueryKey,
+  transactionsSnapshotQueryKey,
+];
+
+const contractMutationQueryKeys = [
+  contractsSnapshotQueryKey,
+  horizonSnapshotQueryKey,
+];
+
+const creditCardMutationQueryKeys = [
+  creditCardsSnapshotQueryKey,
+  financialAnalyticsQueryKey,
+  financialRecordsQueryKey,
+  horizonSnapshotQueryKey,
+  installmentsSnapshotQueryKey,
+];
+
+const creditCardPurchaseMutationQueryKeys = [
+  creditCardsSnapshotQueryKey,
+  financialAnalyticsQueryKey,
+  financialRecordsQueryKey,
+  horizonSnapshotQueryKey,
+  tagsSnapshotQueryKey,
+];
+
+const horizonSettingsMutationQueryKeys = [
+  horizonSnapshotQueryKey,
+  variableExpenseSnapshotQueryKey,
+];
+
+const installmentMutationQueryKeys = [
+  creditCardsSnapshotQueryKey,
+  horizonSnapshotQueryKey,
+  installmentsSnapshotQueryKey,
+];
+
+const provisionMutationQueryKeys = [
+  horizonSnapshotQueryKey,
+  provisionsSnapshotQueryKey,
+];
+
+const variableExpenseMutationQueryKeys = [
+  horizonSnapshotQueryKey,
+  variableExpenseSnapshotQueryKey,
+];
+
+async function invalidateFinancialQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+  queryKeys: ReadonlyArray<ReadonlyArray<unknown>>,
+) {
+  await Promise.all(
+    queryKeys.map((queryKey) =>
+      queryClient.invalidateQueries({ queryKey }),
+    ),
+  );
 }
 
 export function useAccountsSnapshotQuery() {
@@ -142,7 +210,8 @@ export function useCreateAccountMutation() {
 
   return useMutation({
     mutationFn: (input: CreateAccountInput) => financeApi.createAccount(input),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, accountMutationQueryKeys),
   });
 }
 
@@ -151,7 +220,8 @@ export function useUpdateAccountMutation() {
 
   return useMutation({
     mutationFn: (input: UpdateAccountInput) => financeApi.updateAccount(input),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, accountMutationQueryKeys),
   });
 }
 
@@ -160,7 +230,8 @@ export function useArchiveAccountMutation() {
 
   return useMutation({
     mutationFn: (id: string) => financeApi.archiveAccount(id),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, accountMutationQueryKeys),
   });
 }
 
@@ -169,7 +240,8 @@ export function useCreateTransactionMutation() {
 
   return useMutation({
     mutationFn: (input: CreateTransactionInput) => financeApi.createTransaction(input),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, transactionMutationQueryKeys),
   });
 }
 
@@ -178,7 +250,8 @@ export function useCreateTagMutation() {
 
   return useMutation({
     mutationFn: (input: CreateTagInput) => financeApi.createTag(input),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, tagMutationQueryKeys),
   });
 }
 
@@ -187,7 +260,8 @@ export function useCreateContractMutation() {
 
   return useMutation({
     mutationFn: (input: CreateContractInput) => financeApi.createContract(input),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, contractMutationQueryKeys),
   });
 }
 
@@ -196,7 +270,8 @@ export function useCreateCreditCardMutation() {
 
   return useMutation({
     mutationFn: (input: CreateCreditCardInput) => financeApi.createCreditCard(input),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, creditCardMutationQueryKeys),
   });
 }
 
@@ -205,7 +280,8 @@ export function useUpdateCreditCardMutation() {
 
   return useMutation({
     mutationFn: (input: UpdateCreditCardInput) => financeApi.updateCreditCard(input),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, creditCardMutationQueryKeys),
   });
 }
 
@@ -215,7 +291,8 @@ export function useCreateCreditCardPurchaseMutation() {
   return useMutation({
     mutationFn: (input: CreateCreditCardPurchaseInput) =>
       financeApi.createCreditCardPurchase(input),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, creditCardPurchaseMutationQueryKeys),
   });
 }
 
@@ -225,7 +302,8 @@ export function useUpdateCreditCardPurchaseMutation() {
   return useMutation({
     mutationFn: (input: UpdateCreditCardPurchaseInput) =>
       financeApi.updateCreditCardPurchase(input),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, creditCardPurchaseMutationQueryKeys),
   });
 }
 
@@ -234,7 +312,8 @@ export function useUpdateContractMutation() {
 
   return useMutation({
     mutationFn: (input: UpdateContractInput) => financeApi.updateContract(input),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, contractMutationQueryKeys),
   });
 }
 
@@ -244,7 +323,8 @@ export function useCreateContractAdjustmentMutation() {
   return useMutation({
     mutationFn: (input: CreateContractAdjustmentInput) =>
       financeApi.createContractAdjustment(input),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, contractMutationQueryKeys),
   });
 }
 
@@ -253,7 +333,8 @@ export function useEndContractMutation() {
 
   return useMutation({
     mutationFn: (input: EndContractInput) => financeApi.endContract(input),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, contractMutationQueryKeys),
   });
 }
 
@@ -262,7 +343,8 @@ export function useUpdateTransactionMutation() {
 
   return useMutation({
     mutationFn: (input: UpdateTransactionInput) => financeApi.updateTransaction(input),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, transactionMutationQueryKeys),
   });
 }
 
@@ -271,7 +353,8 @@ export function useUpdateTagMutation() {
 
   return useMutation({
     mutationFn: (input: UpdateTagInput) => financeApi.updateTag(input),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, tagMutationQueryKeys),
   });
 }
 
@@ -280,7 +363,8 @@ export function useDeleteTransactionMutation() {
 
   return useMutation({
     mutationFn: (id: string) => financeApi.deleteTransaction(id),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, transactionMutationQueryKeys),
   });
 }
 
@@ -289,7 +373,8 @@ export function useDeleteTagMutation() {
 
   return useMutation({
     mutationFn: (id: string) => financeApi.deleteTag(id),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, tagMutationQueryKeys),
   });
 }
 
@@ -299,7 +384,8 @@ export function useUpdateHorizonSettingsMutation() {
   return useMutation({
     mutationFn: (input: UpdateHorizonSettingsInput) =>
       financeApi.updateHorizonSettings(input),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, horizonSettingsMutationQueryKeys),
   });
 }
 
@@ -309,7 +395,8 @@ export function useCreateInstallmentPlanMutation() {
   return useMutation({
     mutationFn: (input: CreateInstallmentPlanInput) =>
       financeApi.createInstallmentPlan(input),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, installmentMutationQueryKeys),
   });
 }
 
@@ -319,7 +406,8 @@ export function useUpdateInstallmentPlanMutation() {
   return useMutation({
     mutationFn: (input: UpdateInstallmentPlanInput) =>
       financeApi.updateInstallmentPlan(input),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, installmentMutationQueryKeys),
   });
 }
 
@@ -329,7 +417,8 @@ export function useAnticipateInstallmentPlanMutation() {
   return useMutation({
     mutationFn: (input: AnticipateInstallmentPlanInput) =>
       financeApi.anticipateInstallmentPlan(input),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, installmentMutationQueryKeys),
   });
 }
 
@@ -338,7 +427,8 @@ export function useCreateProvisionMutation() {
 
   return useMutation({
     mutationFn: (input: CreateProvisionInput) => financeApi.createProvision(input),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, provisionMutationQueryKeys),
   });
 }
 
@@ -347,7 +437,8 @@ export function useUpdateProvisionMutation() {
 
   return useMutation({
     mutationFn: (input: UpdateProvisionInput) => financeApi.updateProvision(input),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, provisionMutationQueryKeys),
   });
 }
 
@@ -356,7 +447,8 @@ export function useRedeemProvisionMutation() {
 
   return useMutation({
     mutationFn: (input: RedeemProvisionInput) => financeApi.redeemProvision(input),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, provisionMutationQueryKeys),
   });
 }
 
@@ -366,7 +458,8 @@ export function useUpsertVariableExpenseOverrideMutation() {
   return useMutation({
     mutationFn: (input: VariableExpenseOverride) =>
       financeApi.upsertVariableExpenseOverride(input),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, variableExpenseMutationQueryKeys),
   });
 }
 
@@ -376,6 +469,7 @@ export function useRemoveVariableExpenseOverrideMutation() {
   return useMutation({
     mutationFn: (input: RemoveVariableExpenseOverrideInput) =>
       financeApi.removeVariableExpenseOverride(input),
-    onSuccess: async () => invalidateFinancialQueries(queryClient),
+    onSuccess: async () =>
+      invalidateFinancialQueries(queryClient, variableExpenseMutationQueryKeys),
   });
 }

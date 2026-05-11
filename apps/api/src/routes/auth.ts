@@ -1,13 +1,17 @@
 import type { FastifyPluginAsync } from 'fastify';
 
 import {
+  createPrivacyRequestInputSchema,
   loginInputSchema,
   passwordResetInputSchema,
   passwordResetRequestInputSchema,
   passwordResetRequestResultSchema,
+  privacyRequestSchema,
+  privacyRequestsSnapshotSchema,
   registerInputSchema,
   sessionSchema,
 } from '@economy-cash/contracts';
+import { z } from 'zod';
 
 import { env } from '../config';
 import type { AuthService } from '../lib/auth-service';
@@ -18,6 +22,7 @@ const cookieOptions = {
   maxAge: env.SESSION_TTL_HOURS * 60 * 60,
   sameSite: 'lax' as const,
   path: '/',
+  priority: 'high' as const,
   secure: env.NODE_ENV === 'production',
 };
 
@@ -75,8 +80,35 @@ function buildExpiredSessionCookieHeader() {
     parts.push('Partitioned');
   }
 
+  parts.push('Priority=High');
+
   return parts.join('; ');
 }
+
+async function requireAuthenticatedUserId(
+  authService: AuthService,
+  sessionToken: string | undefined,
+) {
+  const sessionResult = await authService.getSession(sessionToken, false);
+
+  if (!sessionResult) {
+    throw new AppError(
+      401,
+      'AUTH_UNAUTHENTICATED',
+      'Sessao invalida ou expirada.',
+    );
+  }
+
+  return sessionResult.session.user.id;
+}
+
+const privacyRequestResponseSchema = z.object({
+  request: privacyRequestSchema,
+});
+
+const privacyRequestsResponseSchema = z.object({
+  snapshot: privacyRequestsSnapshotSchema,
+});
 
 export function authRoutes(authService: AuthService): FastifyPluginAsync {
   return async (app) => {
@@ -217,6 +249,43 @@ export function authRoutes(authService: AuthService): FastifyPluginAsync {
     clearSessionCookie(reply);
 
     return reply.code(204).send();
+  });
+
+  app.get('/api/v1/privacy/requests', async (request, reply) => {
+    const userId = await requireAuthenticatedUserId(
+      authService,
+      request.cookies[env.SESSION_COOKIE_NAME],
+    );
+    const snapshot = await authService.listPrivacyRequests(userId);
+
+    return reply.send(privacyRequestsResponseSchema.parse({ snapshot }));
+  });
+
+  app.post('/api/v1/privacy/requests', async (request, reply) => {
+    const parsedBody = createPrivacyRequestInputSchema.safeParse(request.body);
+
+    if (!parsedBody.success) {
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Dados invalidos.',
+        parsedBody.error.flatten(),
+      );
+    }
+
+    const userId = await requireAuthenticatedUserId(
+      authService,
+      request.cookies[env.SESSION_COOKIE_NAME],
+    );
+    const privacyRequest = await authService.createPrivacyRequest(
+      userId,
+      parsedBody.data,
+      getAuthContext(request),
+    );
+
+    return reply
+      .code(201)
+      .send(privacyRequestResponseSchema.parse({ request: privacyRequest }));
   });
   };
 }

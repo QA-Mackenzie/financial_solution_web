@@ -17,64 +17,114 @@ const sanitizeFilters = (
   category: filters.category ? normalizeCategoryLabel(filters.category) : undefined,
 });
 
+const compareFinancialRecords = (
+  left: FinancialRecordListItem,
+  right: FinancialRecordListItem,
+) =>
+  right.occurrenceDate.localeCompare(left.occurrenceDate) ||
+  right.createdAt.localeCompare(left.createdAt) ||
+  left.description.localeCompare(right.description);
+
+const matchesFinancialRecordFilters = (
+  record: FinancialRecordListItem,
+  sanitizedFilters: FinancialRecordFilter,
+) => {
+  if (sanitizedFilters.accountId && record.accountId !== sanitizedFilters.accountId) {
+    return false;
+  }
+
+  if (sanitizedFilters.category && record.category !== sanitizedFilters.category) {
+    return false;
+  }
+
+  if (sanitizedFilters.entityId && record.entityId !== sanitizedFilters.entityId) {
+    return false;
+  }
+
+  if (
+    sanitizedFilters.entityKind &&
+    record.entityKind !== sanitizedFilters.entityKind
+  ) {
+    return false;
+  }
+
+  if (sanitizedFilters.fromDate && record.occurrenceDate < sanitizedFilters.fromDate) {
+    return false;
+  }
+
+  if (sanitizedFilters.recordKind && record.recordKind !== sanitizedFilters.recordKind) {
+    return false;
+  }
+
+  if (
+    sanitizedFilters.tagId &&
+    !record.tags.some((tag) => tag.id === sanitizedFilters.tagId)
+  ) {
+    return false;
+  }
+
+  if (sanitizedFilters.toDate && record.occurrenceDate > sanitizedFilters.toDate) {
+    return false;
+  }
+
+  if (sanitizedFilters.type && record.type !== sanitizedFilters.type) {
+    return false;
+  }
+
+  return true;
+};
+
+interface CollectFilteredFinancialRecordsOptions {
+  sortResults?: boolean;
+}
+
+interface CollectFilteredFinancialRecordsResult {
+  records: FinancialRecordListItem[];
+  totalExpenseInCents: number;
+  totalIncomeInCents: number;
+}
+
+const collectFilteredFinancialRecords = (
+  records: FinancialRecordListItem[],
+  sanitizedFilters: FinancialRecordFilter,
+  options: CollectFilteredFinancialRecordsOptions = {},
+): CollectFilteredFinancialRecordsResult => {
+  const filteredRecords: FinancialRecordListItem[] = [];
+  let totalIncomeInCents = 0;
+  let totalExpenseInCents = 0;
+
+  for (const record of records) {
+    if (!matchesFinancialRecordFilters(record, sanitizedFilters)) {
+      continue;
+    }
+
+    filteredRecords.push(record);
+
+    if (record.type === 'income') {
+      totalIncomeInCents += record.amountInCents;
+    } else {
+      totalExpenseInCents += record.amountInCents;
+    }
+  }
+
+  if (options.sortResults !== false) {
+    filteredRecords.sort(compareFinancialRecords);
+  }
+
+  return {
+    records: filteredRecords,
+    totalExpenseInCents,
+    totalIncomeInCents,
+  };
+};
+
 export const filterFinancialRecords = (
   records: FinancialRecordListItem[],
   filters: FinancialRecordFilter = {},
 ): FinancialRecordListItem[] => {
   const sanitizedFilters = sanitizeFilters(filters);
 
-  return records
-    .filter((record) => {
-      if (sanitizedFilters.accountId && record.accountId !== sanitizedFilters.accountId) {
-        return false;
-      }
-
-      if (sanitizedFilters.category && record.category !== sanitizedFilters.category) {
-        return false;
-      }
-
-      if (sanitizedFilters.entityId && record.entityId !== sanitizedFilters.entityId) {
-        return false;
-      }
-
-      if (
-        sanitizedFilters.entityKind &&
-        record.entityKind !== sanitizedFilters.entityKind
-      ) {
-        return false;
-      }
-
-      if (sanitizedFilters.fromDate && record.occurrenceDate < sanitizedFilters.fromDate) {
-        return false;
-      }
-
-      if (sanitizedFilters.recordKind && record.recordKind !== sanitizedFilters.recordKind) {
-        return false;
-      }
-
-      if (
-        sanitizedFilters.tagId &&
-        !record.tags.some((tag) => tag.id === sanitizedFilters.tagId)
-      ) {
-        return false;
-      }
-
-      if (sanitizedFilters.toDate && record.occurrenceDate > sanitizedFilters.toDate) {
-        return false;
-      }
-
-      if (sanitizedFilters.type && record.type !== sanitizedFilters.type) {
-        return false;
-      }
-
-      return true;
-    })
-    .sort(
-      (left, right) =>
-        right.occurrenceDate.localeCompare(left.occurrenceDate) ||
-        right.createdAt.localeCompare(left.createdAt) ||
-        left.description.localeCompare(right.description),
-    );
+  return collectFilteredFinancialRecords(records, sanitizedFilters).records;
 };
 
 export const buildFinancialRecordQuerySnapshot = (
@@ -82,20 +132,14 @@ export const buildFinancialRecordQuerySnapshot = (
   filters: FinancialRecordFilter = {},
 ): FinancialRecordQuerySnapshot => {
   const appliedFilters = sanitizeFilters(filters);
-  const filteredRecords = filterFinancialRecords(records, appliedFilters);
-  const totalIncomeInCents = filteredRecords
-    .filter((record) => record.type === 'income')
-    .reduce((sum, record) => sum + record.amountInCents, 0);
-  const totalExpenseInCents = filteredRecords
-    .filter((record) => record.type === 'expense')
-    .reduce((sum, record) => sum + record.amountInCents, 0);
+  const filteredSnapshot = collectFilteredFinancialRecords(records, appliedFilters);
 
   return {
     appliedFilters,
-    recordCount: filteredRecords.length,
-    totalExpenseInCents,
-    totalIncomeInCents,
-    records: filteredRecords,
+    recordCount: filteredSnapshot.records.length,
+    totalExpenseInCents: filteredSnapshot.totalExpenseInCents,
+    totalIncomeInCents: filteredSnapshot.totalIncomeInCents,
+    records: filteredSnapshot.records,
   };
 };
 
@@ -122,7 +166,10 @@ export const buildFinancialAnalyticsSnapshot = (
   records: FinancialRecordListItem[],
   filters: FinancialRecordFilter = {},
 ): FinancialAnalyticsSnapshot => {
-  const querySnapshot = buildFinancialRecordQuerySnapshot(records, filters);
+  const appliedFilters = sanitizeFilters(filters);
+  const filteredSnapshot = collectFilteredFinancialRecords(records, appliedFilters, {
+    sortResults: false,
+  });
   const categoryBuckets = new Map<string, AggregateBucket>();
   const entityBuckets = new Map<string, AggregateBucket & {
     entityId: string;
@@ -132,7 +179,7 @@ export const buildFinancialAnalyticsSnapshot = (
   const monthBuckets = new Map<string, AggregateBucket>();
   const tagBuckets = new Map<string, AggregateBucket & { tagId: string; tagName: string }>();
 
-  for (const record of querySnapshot.records) {
+  for (const record of filteredSnapshot.records) {
     const category = record.category || DEFAULT_UNCATEGORIZED_CATEGORY;
     const categoryBucket = categoryBuckets.get(category) ?? {
       count: 0,
@@ -233,14 +280,15 @@ export const buildFinancialAnalyticsSnapshot = (
     );
 
   return {
-    appliedFilters: querySnapshot.appliedFilters,
+    appliedFilters,
     byCategory,
     byEntity,
     byMonth,
     byTag,
-    netAmountInCents: querySnapshot.totalIncomeInCents - querySnapshot.totalExpenseInCents,
-    recordCount: querySnapshot.recordCount,
-    totalExpenseInCents: querySnapshot.totalExpenseInCents,
-    totalIncomeInCents: querySnapshot.totalIncomeInCents,
+    netAmountInCents:
+      filteredSnapshot.totalIncomeInCents - filteredSnapshot.totalExpenseInCents,
+    recordCount: filteredSnapshot.records.length,
+    totalExpenseInCents: filteredSnapshot.totalExpenseInCents,
+    totalIncomeInCents: filteredSnapshot.totalIncomeInCents,
   };
 };

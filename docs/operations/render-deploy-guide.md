@@ -50,8 +50,19 @@ Voce nao precisa preencher manualmente:
 - NODE_ENV
 - SESSION_COOKIE_NAME
 - SESSION_TTL_HOURS
+- SESSION_ABSOLUTE_TTL_HOURS
 - PASSWORD_RESET_TOKEN_TTL_MINUTES
 - EMAIL_VERIFICATION_TOKEN_TTL_HOURS
+- AUTH_RATE_LIMIT_MAX
+- AUTH_RATE_LIMIT_WINDOW_MS
+- PASSWORD_RECOVERY_RATE_LIMIT_MAX
+- PASSWORD_RECOVERY_RATE_LIMIT_WINDOW_MS
+- EXPENSIVE_READ_RATE_LIMIT_MAX
+- EXPENSIVE_READ_RATE_LIMIT_WINDOW_MS
+- AUTH_AUDIT_LOG_RETENTION_DAYS
+- SESSION_RETENTION_DAYS
+- TOKEN_RETENTION_DAYS
+- PRIVACY_REQUEST_RETENTION_DAYS
 - CONSENT_VERSION
 - LOG_LEVEL
 - SKIP_INSTALL_DEPS
@@ -127,9 +138,19 @@ Se voce quiser dados de exemplo, aplique esses scripts depois que o banco estive
 Depois que os recursos ficarem saudaveis:
 
 1. abra a URL da API e teste /health
+2. para troubleshooting autenticado, valide /readyz no ambiente protegido ou tunnel operacional
 2. abra a URL do frontend
 3. teste login ou cadastro
 4. recarregue a pagina para validar sessao
+
+## Afinacoes opcionais da Sprint 11
+
+Os valores abaixo ja saem preenchidos no Blueprint, mas devem ser revisitados antes de ampliar a exposicao do produto:
+
+- AUTH_RATE_LIMIT_MAX e PASSWORD_RECOVERY_RATE_LIMIT_MAX para brute force e abuso de recovery
+- EXPENSIVE_READ_RATE_LIMIT_MAX para leituras de horizonte e analytics em horarios de pico
+- SESSION_ABSOLUTE_TTL_HOURS para o prazo maximo de vida da sessao
+- AUTH_AUDIT_LOG_RETENTION_DAYS, SESSION_RETENTION_DAYS, TOKEN_RETENTION_DAYS e PRIVACY_REQUEST_RETENTION_DAYS para o job operacional de limpeza
 
 ## Problemas mais comuns
 

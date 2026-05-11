@@ -67,10 +67,32 @@ services:
         value: economy_cash_session
       - key: SESSION_TTL_HOURS
         value: "168"
+      - key: SESSION_ABSOLUTE_TTL_HOURS
+        value: "720"
       - key: PASSWORD_RESET_TOKEN_TTL_MINUTES
         value: "30"
       - key: EMAIL_VERIFICATION_TOKEN_TTL_HOURS
         value: "24"
+      - key: AUTH_RATE_LIMIT_MAX
+        value: "10"
+      - key: AUTH_RATE_LIMIT_WINDOW_MS
+        value: "60000"
+      - key: PASSWORD_RECOVERY_RATE_LIMIT_MAX
+        value: "5"
+      - key: PASSWORD_RECOVERY_RATE_LIMIT_WINDOW_MS
+        value: "900000"
+      - key: EXPENSIVE_READ_RATE_LIMIT_MAX
+        value: "60"
+      - key: EXPENSIVE_READ_RATE_LIMIT_WINDOW_MS
+        value: "60000"
+      - key: AUTH_AUDIT_LOG_RETENTION_DAYS
+        value: "180"
+      - key: SESSION_RETENTION_DAYS
+        value: "30"
+      - key: TOKEN_RETENTION_DAYS
+        value: "30"
+      - key: PRIVACY_REQUEST_RETENTION_DAYS
+        value: "730"
       - key: CONSENT_VERSION
         value: 2026-05
       - key: LOG_LEVEL

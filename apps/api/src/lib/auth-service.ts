@@ -1,10 +1,13 @@
 import { randomUUID } from 'node:crypto';
 
 import type {
+  CreatePrivacyRequestInput,
   LoginInput,
   PasswordResetInput,
   PasswordResetRequestInput,
   PasswordResetRequestResult,
+  PrivacyRequest,
+  PrivacyRequestsSnapshot,
   RegisterInput,
   SessionPayload,
 } from '@economy-cash/contracts';
@@ -32,6 +35,7 @@ type AuthServiceOptions = {
   emailVerificationTokenTtlMs?: number;
   now?: () => Date;
   passwordResetTokenTtlMs?: number;
+  sessionAbsoluteTtlMs?: number;
   sessionTtlMs?: number;
 };
 
@@ -44,6 +48,7 @@ type UserRecord = QueryResultRow & {
 };
 
 type SessionRecord = QueryResultRow & {
+  created_at: Date | string;
   expires_at: Date | string;
   issued_at: Date | string;
   user_email: string;
@@ -58,6 +63,15 @@ type PasswordResetTokenRecord = QueryResultRow & {
   user_id: string;
 };
 
+type PrivacyRequestRecord = QueryResultRow & {
+  id: string;
+  justification: string;
+  request_type: 'anonymization' | 'erasure';
+  requested_at: Date | string;
+  resolved_at: Date | string | null;
+  status: 'completed' | 'pending' | 'processing' | 'rejected';
+};
+
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -69,6 +83,8 @@ export class AuthService {
   private readonly now: () => Date;
 
   private readonly passwordResetTokenTtlMs: number;
+
+  private readonly sessionAbsoluteTtlMs: number;
 
   private readonly sessionTtlMs: number;
 
@@ -84,6 +100,9 @@ export class AuthService {
     this.passwordResetTokenTtlMs =
       options.passwordResetTokenTtlMs ??
       env.PASSWORD_RESET_TOKEN_TTL_MINUTES * 60 * 1000;
+    this.sessionAbsoluteTtlMs =
+      options.sessionAbsoluteTtlMs ??
+      env.SESSION_ABSOLUTE_TTL_HOURS * 60 * 60 * 1000;
     this.sessionTtlMs = options.sessionTtlMs ?? env.SESSION_TTL_HOURS * 60 * 60 * 1000;
   }
 
@@ -253,6 +272,18 @@ export class AuthService {
 
     const now = this.now();
     const expiresAt = new Date(session.expires_at);
+    const createdAt = new Date(session.created_at);
+
+    if (createdAt.getTime() + this.sessionAbsoluteTtlMs <= now.getTime()) {
+      await this.database.query(
+        `update auth.sessions
+         set revoked_at = $2
+         where id = $1 and revoked_at is null`,
+        [normalizedSessionToken, now.toISOString()],
+      );
+
+      return null;
+    }
 
     if (expiresAt <= now) {
       await this.database.query(
@@ -452,6 +483,85 @@ export class AuthService {
     });
   }
 
+  async listPrivacyRequests(userId: string): Promise<PrivacyRequestsSnapshot> {
+    const result = await this.database.query<PrivacyRequestRecord>(
+      `select id,
+              request_type,
+              status,
+              justification,
+              requested_at,
+              resolved_at
+         from auth.privacy_requests
+        where user_id = $1
+        order by requested_at desc`,
+      [userId],
+    );
+
+    return {
+      requests: result.rows.map((request) => this.toPrivacyRequest(request)),
+    };
+  }
+
+  async createPrivacyRequest(
+    userId: string,
+    input: CreatePrivacyRequestInput,
+    context: AuthRequestContext,
+  ): Promise<PrivacyRequest> {
+    return this.database.runInTransaction(async (transaction) => {
+      const existingRequest = await transaction.query<{ id: string }>(
+        `select id
+           from auth.privacy_requests
+          where user_id = $1
+            and request_type = $2
+            and status in ('pending', 'processing')
+          limit 1`,
+        [userId, input.requestType],
+      );
+
+      if ((existingRequest.rowCount ?? 0) > 0) {
+        throw new AppError(
+          409,
+          'PRIVACY_REQUEST_ALREADY_OPEN',
+          'Ja existe uma solicitacao em andamento para esse tipo de atendimento.',
+        );
+      }
+
+      const now = this.now();
+      const result = await transaction.query<PrivacyRequestRecord>(
+        `insert into auth.privacy_requests (
+          id,
+          user_id,
+          request_type,
+          status,
+          justification,
+          requested_at,
+          resolved_at
+        ) values ($1, $2, $3, $4, $5, $6, $7)
+        returning id,
+                  request_type,
+                  status,
+                  justification,
+                  requested_at,
+                  resolved_at`,
+        [
+          randomUUID(),
+          userId,
+          input.requestType,
+          'pending',
+          input.justification.trim(),
+          now.toISOString(),
+          null,
+        ],
+      );
+
+      await this.insertAuditLog(transaction, userId, 'PRIVACY_REQUEST_CREATED', context, {
+        requestType: input.requestType,
+      });
+
+      return this.toPrivacyRequest(result.rows[0]);
+    });
+  }
+
   private async createEmailVerificationToken(
     transaction: DatabaseExecutor,
     userId: string,
@@ -522,7 +632,8 @@ export class AuthService {
 
   private async findSession(sessionToken: string): Promise<SessionRecord | null> {
     const result = await this.database.query<SessionRecord>(
-      `select s.issued_at,
+      `select s.created_at,
+              s.issued_at,
               s.expires_at,
               u.id as user_id,
               u.name as user_name,
@@ -578,6 +689,17 @@ export class AuthService {
         id: session.user_id,
         name: session.user_name,
       },
+    };
+  }
+
+  private toPrivacyRequest(request: PrivacyRequestRecord): PrivacyRequest {
+    return {
+      id: request.id,
+      justification: request.justification,
+      requestType: request.request_type,
+      requestedAt: toRequiredIsoString(request.requested_at),
+      resolvedAt: toIsoString(request.resolved_at),
+      status: request.status,
     };
   }
 }
