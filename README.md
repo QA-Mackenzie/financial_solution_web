@@ -50,6 +50,7 @@ npm run check
 - erros da API sao serializados em um formato estavel com code, message e requestId
 - logs da API ocultam campos sensiveis como senha, cookie e authorization
 
-## Guias operacionais
+## Guias operacionais e de engenharia
 
 - publicacao no Render: [docs/operations/render-deploy-guide.md](docs/operations/render-deploy-guide.md)
+- roadmap de refatoracao: [docs/process/refactoring-roadmap.md](docs/process/refactoring-roadmap.md)

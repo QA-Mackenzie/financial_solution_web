@@ -2,6 +2,7 @@ import type {
   Account,
   AccountsSnapshot,
   AnticipateInstallmentPlanInput,
+  CreatePrivacyRequestInput,
   CreateTagInput,
   CreditCardListItem,
   CreditCardPurchaseListItem,
@@ -30,6 +31,8 @@ import type {
   PasswordResetInput,
   PasswordResetRequestInput,
   PasswordResetRequestResult,
+  PrivacyRequest,
+  PrivacyRequestsSnapshot,
   ProvisionsPlanningSnapshot,
   ProvisionListItem,
   RegisterInput,
@@ -160,6 +163,23 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify(input),
     });
+  },
+  async getPrivacyRequests(): Promise<PrivacyRequestsSnapshot> {
+    const payload = await request<{ snapshot: PrivacyRequestsSnapshot }>(
+      '/api/v1/privacy/requests',
+    );
+
+    return payload.snapshot;
+  },
+  async createPrivacyRequest(
+    input: CreatePrivacyRequestInput,
+  ): Promise<PrivacyRequest> {
+    const payload = await request<{ request: PrivacyRequest }>('/api/v1/privacy/requests', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+
+    return payload.request;
   },
 };
 

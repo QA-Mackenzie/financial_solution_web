@@ -64,3 +64,23 @@ create table if not exists auth.audit_logs (
 
 create index if not exists auth_audit_logs_user_idx on auth.audit_logs (user_id, occurred_at desc);
 create index if not exists auth_audit_logs_event_idx on auth.audit_logs (event_type, occurred_at desc);
+
+create table if not exists auth.privacy_requests (
+  id uuid primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  request_type text not null,
+  status text not null,
+  justification text not null,
+  requested_at timestamptz not null,
+  resolved_at timestamptz null,
+  constraint auth_privacy_requests_type_check
+    check (request_type in ('anonymization', 'erasure')),
+  constraint auth_privacy_requests_status_check
+    check (status in ('pending', 'processing', 'completed', 'rejected'))
+);
+
+create index if not exists auth_privacy_requests_user_idx
+  on auth.privacy_requests (user_id, requested_at desc);
+
+create index if not exists auth_privacy_requests_status_idx
+  on auth.privacy_requests (status, requested_at desc);

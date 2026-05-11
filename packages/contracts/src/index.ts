@@ -6,6 +6,7 @@ export * from './contract';
 export * from './creditCard';
 export * from './horizon';
 export * from './installment';
+export * from './privacy';
 export * from './provision';
 export * from './tag';
 export * from './transaction';

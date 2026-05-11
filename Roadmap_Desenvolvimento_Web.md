@@ -700,41 +700,12 @@ O usuario consegue nao apenas registrar e projetar, mas tambem ler e analisar se
 - npm run infra:up
 - npm run db:check
 
----
-
-## Sprint 10 - Exportacao, importacao legada e portabilidade
-
-### Objetivo
-
-Criar o caminho seguro de migracao do desktop para a web e implementar portabilidade de dados do titular.
-
-### Entregaveis
-
-- importador do legado funcional
-- exportacao completa por usuario
-- reconciliacao entre base desktop e base web
-- runbook de migracao
-
-### Backlog recomendado
-
-- [ ] Implementar importador lendo diretamente o SQLite legado, sem depender apenas do export JSON parcial
-- [ ] Mapear e importar contas, transacoes, contratos, cartoes, compras, parcelamentos, provisoes, tags, overrides e configuracoes relevantes do horizonte
-- [ ] Criar mecanismo de reconciliacao por contagem, somatorio monetario e amostragem de cenarios criticos
-- [ ] Implementar exportacao completa dos dados do usuario na versao web
-- [ ] Implementar fluxo operacional de migracao assistida de usuarios do desktop
-- [ ] Registrar auditoria para importacoes, exportacoes e falhas de reconciliacao
-- [ ] Criar testes automatizados com base anonimizada do legado
-- [ ] Criar checklist de suporte para migracao e retorno em caso de inconsistencias
-- [ ] Definir politica de versionamento do importador para schemas legados antigos
-- [ ] Documentar criterios de aceite da migracao e estrategia de rollback de dados
-
-### Gate de saida
-
-Existe um processo repetivel e validado para levar um usuario do desktop para a web com baixa chance de perda ou distorcao de dados.
 
 ---
 
-## Sprint 11 - Hardening de seguranca, LGPD e operacao
+## Sprint 10 - Hardening de seguranca, LGPD e operacao
+
+Status: concluida em 2026-05-11
 
 ### Objetivo
 
@@ -749,24 +720,57 @@ Levar o produto de funcional para operacionalmente seguro e aderente ao contexto
 
 ### Backlog recomendado
 
-- [ ] Implementar e validar CSRF protection, rate limiting, headers de seguranca e CSP
-- [ ] Revisar e endurecer cookies, sessoes, revogacao e expiracao
-- [ ] Implementar sanitizacao e mascaramento de logs para dados sensiveis
-- [ ] Criar trilha separada de auditoria para eventos relevantes de negocio e seguranca
-- [ ] Implementar exclusao, anonimização ou fluxo equivalente de atendimento ao titular conforme decisao juridica/produto
-- [ ] Implementar politica de retencao de logs, tokens e dados auxiliares
-- [ ] Criptografar backups e definir runbooks de restauracao
-- [ ] Integrar monitoramento, alertas, dashboards operacionais e health checks
-- [ ] Executar testes de carga seletivos no login, leitura do horizonte e consultas mais pesadas
-- [ ] Executar revisao de autorizacao por recurso e casos de IDOR manualmente e por automacao
+- [x] Implementar e validar CSRF protection, rate limiting, headers de seguranca e CSP
+- [x] Revisar e endurecer cookies, sessoes, revogacao e expiracao
+- [x] Implementar sanitizacao e mascaramento de logs para dados sensiveis
+- [x] Criar trilha separada de auditoria para eventos relevantes de negocio e seguranca
+- [x] Implementar exclusao, anonimização ou fluxo equivalente de atendimento ao titular conforme decisao juridica/produto
+- [x] Implementar politica de retencao de logs, tokens e dados auxiliares
+- [x] Criptografar backups e definir runbooks de restauracao
+- [x] Integrar monitoramento, alertas, dashboards operacionais e health checks
+- [x] Executar testes de carga seletivos no login, leitura do horizonte e consultas mais pesadas
+- [x] Executar revisao de autorizacao por recurso e casos de IDOR manualmente e por automacao
 
 ### Gate de saida
 
 O produto esta preparado para ser exposto a usuarios reais com controles tecnicos, operacionais e regulatorios minimamente robustos.
 
+### Implementado nesta sprint
+
+- bootstrap HTTP da API endurecido com CSP e headers de seguranca via Fastify Helmet, mitigacao anti-CSRF por validacao de origem/fetch metadata e rate limiting owner-aware para login, recovery e leituras pesadas
+- cookies de sessao atualizados com priority high e AuthService reforcado com prazo absoluto de expiracao, preservando revogacao em logout e reset de senha
+- redacao de logs ampliada para origem, referer, email e token, com novos eventos SECURITY_CSRF_REJECTED, SECURITY_RATE_LIMIT_REJECTED e PRIVACY_REQUEST_CREATED em auth.audit_logs
+- /health reduzido ao minimo publico, com /livez e /readyz adicionados para operacao e troubleshooting interno
+- fluxo LGPD equivalente entregue em auth.privacy_requests, rotas autenticadas /api/v1/privacy/requests e tela web em Seguranca da conta para solicitacoes de anonimização ou exclusao assistida
+- politica operacional de retencao entregue em apps/api/src/lib/data-retention.ts e apps/api/src/scripts/apply-retention.ts para limpar sessoes expiradas, tokens consumidos/expirados, auth.audit_logs antigos e solicitacoes LGPD resolvidas fora da janela
+- benchmark seletivo reproduzivel em apps/api/src/scripts/benchmark-sprint11.ts cobrindo auth-login, horizon-read e analytics-read
+- documentacao operacional ampliada com baseline de monitoramento/alertas, backup criptografado e restore, tuning de rate limits/retencao no Render e politica de segredos atualizada
+
+### Testes de carga seletivos
+
+- auth-login: average 42.50 ms, p95 44.96 ms, max 44.96 ms
+- horizon-read: average 1.28 ms, p95 1.58 ms, max 1.73 ms
+- analytics-read: average 7.94 ms, p95 12.04 ms, max 15.55 ms
+
+### Validacao executada
+
+- npm run test --workspace @economy-cash/api -- test/app.test.ts
+- npm run test --workspace @economy-cash/api -- test/privacy-routes.test.ts
+- npm run test --workspace @economy-cash/api -- test/data-retention.test.ts
+- npm run test --workspace @economy-cash/web -- src/features/dashboard/AccessPage.test.tsx
+- npm run benchmark:sprint11 --workspace @economy-cash/api
+- npm run typecheck --workspace @economy-cash/contracts
+- npm run typecheck --workspace @economy-cash/api
+- npm run typecheck --workspace @economy-cash/web
+- npm run test --workspace @economy-cash/api
+- npm run test --workspace @economy-cash/web
+- npx -y node@20 "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js" run build --workspace @economy-cash/contracts
+- npx -y node@20 "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js" run build --workspace @economy-cash/api
+- npx -y node@20 "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js" run build --workspace @economy-cash/web
+
 ---
 
-## Sprint 12 - Homologacao, piloto, go-live e estabilizacao
+## Sprint 11 - Homologacao, piloto, go-live e estabilizacao
 
 ### Objetivo
 

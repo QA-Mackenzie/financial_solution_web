@@ -52,7 +52,7 @@ afterEach(async () => {
 });
 
 describe('api bootstrap', () => {
-  it('retorna health check', async () => {
+  it('retorna health check publico minimizado com headers de seguranca', async () => {
     const app = buildApp({ database: makeDatabaseStub() });
 
     const response = await app.inject({
@@ -61,6 +61,21 @@ describe('api bootstrap', () => {
       headers: {
         'x-correlation-id': 'health-check-001',
       },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ status: 'ok' });
+    expect(response.headers['content-security-policy']).toContain("default-src 'none'");
+    expect(response.headers['x-frame-options']).toBe('SAMEORIGIN');
+    expect(response.headers['x-correlation-id']).toBe('health-check-001');
+  });
+
+  it('retorna readiness detalhado para uso operacional', async () => {
+    const app = buildApp({ database: makeDatabaseStub() });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/readyz',
     });
 
     expect(response.statusCode).toBe(200);
@@ -75,7 +90,6 @@ describe('api bootstrap', () => {
       service: 'economy-cash-api',
       status: 'ok',
     });
-    expect(response.headers['x-correlation-id']).toBe('health-check-001');
   });
 
   it('cria sessao apos cadastro e expoe a sessao atual', async () => {
@@ -247,5 +261,84 @@ describe('api bootstrap', () => {
     });
 
     expect(newLoginResponse.statusCode).toBe(200);
+  });
+
+  it('bloqueia mutacoes vindas de origem cruzada e audita a tentativa', async () => {
+    const response = await authEnvironment!.app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/register',
+      headers: {
+        origin: 'https://evil.example.com',
+      },
+      payload: makeRegisterInputFixture(),
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({
+      error: {
+        code: 'SECURITY_CSRF_REJECTED',
+        message: 'Origem invalida para esta operacao.',
+      },
+    });
+
+    const auditResult = await authEnvironment!.database.query<{ event_type: string }>(
+      `select event_type
+         from auth.audit_logs
+        where event_type = 'SECURITY_CSRF_REJECTED'`,
+    );
+
+    expect(auditResult.rowCount).toBe(1);
+  });
+
+  it('aplica rate limiting nas rotas de autenticacao mais sensiveis', async () => {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const response = await authEnvironment!.app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/login',
+        payload: makeLoginInputFixture({
+          email: 'naoexiste@example.com',
+        }),
+      });
+
+      expect(response.statusCode).toBe(401);
+      expect(response.headers['x-rate-limit-limit']).toBe('10');
+    }
+
+    const limitedResponse = await authEnvironment!.app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      payload: makeLoginInputFixture({
+        email: 'naoexiste@example.com',
+      }),
+    });
+
+    expect(limitedResponse.statusCode).toBe(429);
+    expect(limitedResponse.headers['retry-after']).toBeTruthy();
+    expect(limitedResponse.json()).toMatchObject({
+      error: {
+        code: 'SECURITY_RATE_LIMIT_REJECTED',
+      },
+    });
+  });
+
+  it('revoga sessoes que ultrapassam o prazo absoluto', async () => {
+    const registerResponse = await authEnvironment!.app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/register',
+      payload: makeRegisterInputFixture(),
+    });
+
+    authEnvironment!.advanceTime(721 * 60 * 60 * 1000);
+
+    const sessionResponse = await authEnvironment!.app.inject({
+      method: 'GET',
+      url: '/api/v1/session',
+      headers: {
+        cookie: registerResponse.headers['set-cookie'] as string,
+      },
+    });
+
+    expect(sessionResponse.statusCode).toBe(200);
+    expect(sessionResponse.json()).toEqual({ session: null });
   });
 });
