@@ -5,6 +5,29 @@ export type SerializedErrorBody = {
   requestId: string;
 };
 
+export type SerializedErrorLog = {
+  code?: string;
+  message: string;
+  name?: string;
+  statusCode?: number;
+};
+
+const LOG_MESSAGE_REDACTIONS = [
+  {
+    pattern: /(postgres(?:ql)?:\/\/)([^@\s]+)@/gi,
+    replacement: '$1[redacted]@',
+  },
+  {
+    pattern: /(Bearer\s+)([^\s]+)/gi,
+    replacement: '$1[redacted]',
+  },
+  {
+    pattern:
+      /\b(DATABASE_URL|SESSION_SECRET|BACKUP_ENCRYPTION_PASSPHRASE)\b(\s*[=:]\s*)([^\s,;]+)/gi,
+    replacement: '$1$2[redacted]',
+  },
+] as const;
+
 export class AppError extends Error {
   constructor(
     readonly statusCode: number,
@@ -14,6 +37,13 @@ export class AppError extends Error {
   ) {
     super(message);
   }
+}
+
+export function sanitizeLogMessage(message: string): string {
+  return LOG_MESSAGE_REDACTIONS.reduce(
+    (current, redaction) => current.replace(redaction.pattern, redaction.replacement),
+    message,
+  );
 }
 
 export function serializeError(
@@ -44,8 +74,30 @@ export function serializeError(
 
 export function getErrorLogMessage(error: unknown): string {
   if (error instanceof Error) {
-    return error.message;
+    return sanitizeLogMessage(error.message);
   }
 
   return 'Erro nao identificado';
+}
+
+export function serializeErrorForLog(error: unknown): SerializedErrorLog {
+  if (error instanceof AppError) {
+    return {
+      code: error.code,
+      message: sanitizeLogMessage(error.message),
+      name: error.name,
+      statusCode: error.statusCode,
+    };
+  }
+
+  if (error instanceof Error) {
+    return {
+      message: sanitizeLogMessage(error.message),
+      name: error.name,
+    };
+  }
+
+  return {
+    message: 'Erro nao identificado',
+  };
 }

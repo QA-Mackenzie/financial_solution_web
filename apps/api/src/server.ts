@@ -2,6 +2,7 @@ import { buildApp } from './app';
 import { env } from './config';
 import { ensureDatabaseSchema } from './lib/database-bootstrap';
 import { createDatabaseClient } from './lib/database';
+import { getErrorLogMessage, serializeErrorForLog } from './lib/errors';
 
 async function start() {
   const database = createDatabaseClient();
@@ -14,7 +15,7 @@ async function start() {
       port: env.API_PORT,
     });
   } catch (error) {
-    app.log.error(error);
+    app.log.error({ error: serializeErrorForLog(error) }, getErrorLogMessage(error));
     await app.close();
     process.exit(1);
   }
