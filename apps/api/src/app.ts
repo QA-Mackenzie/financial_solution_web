@@ -7,7 +7,12 @@ import { randomUUID } from 'node:crypto';
 import { env } from './config';
 import { AuthService } from './lib/auth-service';
 import { createDatabaseClient, type DatabaseClient } from './lib/database';
-import { AppError, getErrorLogMessage, serializeError } from './lib/errors';
+import {
+  AppError,
+  getErrorLogMessage,
+  serializeError,
+  serializeErrorForLog,
+} from './lib/errors';
 import { FinanceService } from './lib/finance-service';
 import {
   getOriginViolation,
@@ -25,6 +30,32 @@ type BuildAppOptions = {
   database?: DatabaseClient;
   now?: () => Date;
 };
+
+export const REDACTED_LOG_PATHS: string[] = [
+  'req.headers.authorization',
+  'req.headers.cookie',
+  'req.headers.origin',
+  'req.headers.referer',
+  'req.headers["proxy-authorization"]',
+  'req.headers["x-api-key"]',
+  'req.query.token',
+  'req.query.code',
+  'req.body.email',
+  'req.body.password',
+  'req.body.currentPassword',
+  'req.body.newPassword',
+  'req.body.passwordConfirmation',
+  'req.body.token',
+  'req.body.previewToken',
+  'req.body.sessionToken',
+  'req.body.refreshToken',
+  'req.body.accessToken',
+  'req.body.secret',
+  'req.body.apiKey',
+  'req.body.clientSecret',
+  'req.body.passphrase',
+  'res.headers["set-cookie"]',
+];
 
 export function buildApp(options: BuildAppOptions = {}) {
   const database = options.database ?? createDatabaseClient();
@@ -58,16 +89,7 @@ export function buildApp(options: BuildAppOptions = {}) {
             level: env.LOG_LEVEL,
             redact: {
               censor: '[redacted]',
-              paths: [
-                'req.headers.authorization',
-                'req.headers.cookie',
-                'req.headers.origin',
-                'req.headers.referer',
-                'req.body.password',
-                'req.body.email',
-                'req.body.token',
-                'res.headers["set-cookie"]',
-              ],
+              paths: REDACTED_LOG_PATHS,
             },
           },
   });
@@ -82,7 +104,7 @@ export function buildApp(options: BuildAppOptions = {}) {
     request.log.error(
       {
         code: serializedError.body.code,
-        err: error,
+        error: serializeErrorForLog(error),
         requestId: request.id,
       },
       getErrorLogMessage(error),
