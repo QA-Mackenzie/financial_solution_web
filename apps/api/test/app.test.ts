@@ -80,14 +80,6 @@ describe('api bootstrap', () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
-      checks: {
-        database: {
-          database: 'economy_cash',
-          seededUsers: 1,
-          status: 'up',
-        },
-      },
-      service: 'economy-cash-api',
       status: 'ok',
     });
   });

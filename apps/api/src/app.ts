@@ -98,6 +98,13 @@ export function buildApp(options: BuildAppOptions = {}) {
     reply.header('x-correlation-id', request.id);
   });
 
+  app.addHook('onSend', async (request, reply) => {
+    if (request.url.startsWith('/api/v1/')) {
+      reply.header('cache-control', 'no-store, no-cache, must-revalidate, private');
+      reply.header('pragma', 'no-cache');
+    }
+  });
+
   app.setErrorHandler((error, request, reply) => {
     const serializedError = serializeError(error, request.id);
 

@@ -233,7 +233,7 @@ export async function insertSecurityAuditLog(
       eventType,
       request.ip ?? null,
       typeof request.headers['user-agent'] === 'string'
-        ? request.headers['user-agent']
+        ? request.headers['user-agent'].slice(0, 120)
         : null,
       request.id,
       JSON.stringify(details),

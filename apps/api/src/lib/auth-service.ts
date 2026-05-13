@@ -122,7 +122,6 @@ export class AuthService {
 
     if ((existingUser.rowCount ?? 0) > 0) {
       await this.insertAuditLog(this.database, null, 'AUTH_REGISTER_FAILURE', context, {
-        email,
         reason: 'duplicate-email',
       });
 
@@ -182,9 +181,7 @@ export class AuthService {
         now,
       );
 
-      await this.insertAuditLog(transaction, userId, 'AUTH_REGISTER_SUCCESS', context, {
-        email,
-      });
+      await this.insertAuditLog(transaction, userId, 'AUTH_REGISTER_SUCCESS', context, {});
 
       return sessionResult;
     });
@@ -205,7 +202,6 @@ export class AuthService {
 
     if (!user) {
       await this.insertAuditLog(this.database, null, 'AUTH_LOGIN_FAILURE', context, {
-        email,
         reason: 'unknown-email',
       });
 
@@ -220,7 +216,6 @@ export class AuthService {
 
     if (!passwordMatches) {
       await this.insertAuditLog(this.database, user.id, 'AUTH_LOGIN_FAILURE', context, {
-        email,
         reason: 'invalid-password',
       });
 
@@ -246,9 +241,7 @@ export class AuthService {
         now,
       );
 
-      await this.insertAuditLog(transaction, user.id, 'AUTH_LOGIN_SUCCESS', context, {
-        email,
-      });
+      await this.insertAuditLog(transaction, user.id, 'AUTH_LOGIN_SUCCESS', context, {});
 
       return sessionResult;
     });
@@ -366,9 +359,7 @@ export class AuthService {
     const user = userResult.rows[0];
 
     if (!user) {
-      await this.insertAuditLog(this.database, null, 'AUTH_PASSWORD_RESET_IGNORED', context, {
-        email,
-      });
+      await this.insertAuditLog(this.database, null, 'AUTH_PASSWORD_RESET_IGNORED', context, {});
 
       return {
         message:
@@ -410,14 +401,14 @@ export class AuthService {
         user.id,
         'AUTH_PASSWORD_RESET_REQUESTED',
         context,
-        { email },
+        {},
       );
     });
 
     return {
       message:
         'Se o email existir, um link de redefinicao sera disponibilizado.',
-      previewToken: env.NODE_ENV === 'production' ? null : token,
+      previewToken: env.NODE_ENV === 'test' ? token : null,
     };
   }
 
@@ -478,7 +469,7 @@ export class AuthService {
         resetToken.user_id,
         'AUTH_PASSWORD_RESET_SUCCESS',
         context,
-        { email: resetToken.email },
+        {},
       );
     });
   }
@@ -671,7 +662,7 @@ export class AuthService {
         userId,
         eventType,
         context.ipAddress,
-        context.userAgent,
+        context.userAgent ? context.userAgent.slice(0, 120) : null,
         context.requestId,
         JSON.stringify(details),
         this.now().toISOString(),
